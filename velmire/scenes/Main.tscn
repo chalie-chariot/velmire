@@ -1,4 +1,4 @@
-[gd_scene load_steps=4 format=3 uid="uid://b1main001"]
+[gd_scene load_steps=18 format=3 uid="uid://b1main001"]
 
 [ext_resource type="Script" path="res://scripts/Main.gd" id="1_main"]
 
@@ -7,10 +7,68 @@ bg_color = Color(0.05098, 0, 0, 1)
 border_width_bottom = 2
 border_color = Color(1, 0.2, 0.2, 1)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_chatbox"]
-bg_color = Color(0.164706, 0, 0, 1)
-border_width_left = 2
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_leftpanel"]
+bg_color = Color(0.05098, 0, 0, 1)
+border_width_right = 1
 border_color = Color(1, 0.2, 0.2, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_rightpanel"]
+bg_color = Color(0.05098, 0, 0, 1)
+border_width_left = 1
+border_color = Color(1, 0.2, 0.2, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_facecam"]
+bg_color = Color(0.05098, 0, 0, 1)
+border_width_bottom = 1
+border_color = Color(1, 0.2, 0.2, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_chatbox"]
+bg_color = Color(0.101961, 0, 0, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_progress_bg"]
+bg_color = Color(0.227451, 0, 0, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_progress_fill"]
+bg_color = Color(1, 0.2, 0.2, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_facecam_circle"]
+bg_color = Color(1, 1, 1, 1)
+corner_radius_left = 50
+corner_radius_right = 50
+corner_radius_top = 50
+corner_radius_bottom = 50
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slot"]
+bg_color = Color(0.164706, 0, 0, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.2, 0.2, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card"]
+bg_color = Color(0.164706, 0, 0, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.2, 0.2, 1)
+corner_radius_left = 6
+corner_radius_right = 6
+corner_radius_top = 6
+corner_radius_bottom = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_node_slot"]
+bg_color = Color(0.101961, 0, 0, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.2, 0.2, 1)
+corner_radius_left = 4
+corner_radius_right = 4
+corner_radius_top = 4
+corner_radius_bottom = 4
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
@@ -18,8 +76,585 @@ script = ExtResource("1_main")
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 layer = 0
 
-[node name="Background" type="ColorRect" parent="CanvasLayer"]
+[node name="TopBar" type="Panel" parent="CanvasLayer"]
 layout_mode = 3
+anchors_preset = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 1920.0
+offset_bottom = 40.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_topbar")
+
+[node name="LiveLabel" type="Label" parent="CanvasLayer/TopBar"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 16.0
+offset_top = 8.0
+offset_right = 400.0
+offset_bottom = 32.0
+theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 14
+text = "🔴 LIVE | VELMIRE : BLOODCAST"
+
+[node name="TimerLabel" type="Label" parent="CanvasLayer/TopBar"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -35.0
+offset_top = -12.0
+offset_right = 35.0
+offset_bottom = 12.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 20
+text = "00:00"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="LeftPanel" type="Panel" parent="CanvasLayer"]
+layout_mode = 3
+anchors_preset = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 0.0
+offset_top = 40.0
+offset_right = 220.0
+offset_bottom = 1080.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_leftpanel")
+
+[node name="Card1_Resources" type="Panel" parent="CanvasLayer/LeftPanel"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 10.0
+offset_top = 20.0
+offset_right = 210.0
+offset_bottom = 100.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+
+[node name="ResourcesVBox" type="VBoxContainer" parent="CanvasLayer/LeftPanel/Card1_Resources"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 188.0
+offset_bottom = 88.0
+theme_override_constants/separation = 8
+
+[node name="BloodRow" type="HBoxContainer" parent="CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox"]
+layout_mode = 2
+
+[node name="BloodLabel" type="Label" parent="CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/BloodRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "🩸 피"
+
+[node name="BloodValue" type="Label" parent="CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/BloodRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 13
+text = "0"
+horizontal_alignment = 2
+
+[node name="SpecialRow" type="HBoxContainer" parent="CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox"]
+layout_mode = 2
+
+[node name="SpecialLabel" type="Label" parent="CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/SpecialRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "💎 특수재화"
+
+[node name="SpecialValue" type="Label" parent="CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/SpecialRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 13
+text = "0"
+horizontal_alignment = 2
+
+[node name="Card2_Automation" type="Panel" parent="CanvasLayer/LeftPanel"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 10.0
+offset_top = 120.0
+offset_right = 210.0
+offset_bottom = 210.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+
+[node name="AutoLabel" type="Label" parent="CanvasLayer/LeftPanel/Card2_Automation"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 12.0
+offset_top = 8.0
+offset_right = 200.0
+offset_bottom = 24.0
+theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 13
+text = "⚡ 자동화"
+
+[node name="LvLabel" type="Label" parent="CanvasLayer/LeftPanel/Card2_Automation"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 12.0
+offset_top = 26.0
+offset_right = 200.0
+offset_bottom = 40.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 11
+text = "Lv.1 수동"
+
+[node name="AutoProgressBar" type="ProgressBar" parent="CanvasLayer/LeftPanel/Card2_Automation"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 12.0
+offset_top = 52.0
+offset_right = 188.0
+offset_bottom = 58.0
+theme_override_styles/background = SubResource("StyleBoxFlat_progress_bg")
+theme_override_styles/fill = SubResource("StyleBoxFlat_progress_fill")
+max_value = 100.0
+value = 0.0
+
+[node name="Card3_NodeSlots" type="Panel" parent="CanvasLayer/LeftPanel"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 10.0
+offset_top = 240.0
+offset_right = 210.0
+offset_bottom = 590.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+
+[node name="NodeSlotLabel" type="Label" parent="CanvasLayer/LeftPanel/Card3_NodeSlots"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 12.0
+offset_top = 14.0
+offset_right = 200.0
+offset_bottom = 30.0
+theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 13
+text = "보유 노드"
+
+[node name="NodeSlot1" type="Panel" parent="CanvasLayer/LeftPanel/Card3_NodeSlots"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 12.0
+offset_top = 40.0
+offset_right = 82.0
+offset_bottom = 110.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_node_slot")
+
+[node name="Label" type="Label" parent="CanvasLayer/LeftPanel/Card3_NodeSlots/NodeSlot1"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -9.0
+offset_top = -11.0
+offset_right = 9.0
+offset_bottom = 11.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "?"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="NodeSlot2" type="Panel" parent="CanvasLayer/LeftPanel/Card3_NodeSlots"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 94.0
+offset_top = 40.0
+offset_right = 164.0
+offset_bottom = 110.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_node_slot")
+
+[node name="Label" type="Label" parent="CanvasLayer/LeftPanel/Card3_NodeSlots/NodeSlot2"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -9.0
+offset_top = -11.0
+offset_right = 9.0
+offset_bottom = 11.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "?"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="NodeSlot3" type="Panel" parent="CanvasLayer/LeftPanel/Card3_NodeSlots"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 12.0
+offset_top = 122.0
+offset_right = 82.0
+offset_bottom = 192.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_node_slot")
+
+[node name="Label" type="Label" parent="CanvasLayer/LeftPanel/Card3_NodeSlots/NodeSlot3"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -9.0
+offset_top = -11.0
+offset_right = 9.0
+offset_bottom = 11.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "?"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="NodeSlot4" type="Panel" parent="CanvasLayer/LeftPanel/Card3_NodeSlots"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 94.0
+offset_top = 122.0
+offset_right = 164.0
+offset_bottom = 192.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_node_slot")
+
+[node name="Label" type="Label" parent="CanvasLayer/LeftPanel/Card3_NodeSlots/NodeSlot4"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -9.0
+offset_top = -11.0
+offset_right = 9.0
+offset_bottom = 11.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "?"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="NodeSlot5" type="Panel" parent="CanvasLayer/LeftPanel/Card3_NodeSlots"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 12.0
+offset_top = 204.0
+offset_right = 82.0
+offset_bottom = 274.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_node_slot")
+
+[node name="Label" type="Label" parent="CanvasLayer/LeftPanel/Card3_NodeSlots/NodeSlot5"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -9.0
+offset_top = -11.0
+offset_right = 9.0
+offset_bottom = 11.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "?"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="NodeSlot6" type="Panel" parent="CanvasLayer/LeftPanel/Card3_NodeSlots"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 94.0
+offset_top = 204.0
+offset_right = 164.0
+offset_bottom = 274.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_node_slot")
+
+[node name="Label" type="Label" parent="CanvasLayer/LeftPanel/Card3_NodeSlots/NodeSlot6"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -9.0
+offset_top = -11.0
+offset_right = 9.0
+offset_bottom = 11.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "?"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Card4_DeckSlots" type="Panel" parent="CanvasLayer/LeftPanel"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 10.0
+offset_top = 610.0
+offset_right = 210.0
+offset_bottom = 1040.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+
+[node name="DeckSlotLabel" type="Label" parent="CanvasLayer/LeftPanel/Card4_DeckSlots"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 12.0
+offset_top = 8.0
+offset_right = 200.0
+offset_bottom = 24.0
+theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 13
+text = "장착 노드"
+
+[node name="DeckSlot1" type="Panel" parent="CanvasLayer/LeftPanel/Card4_DeckSlots"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 12.0
+offset_top = 32.0
+offset_right = 188.0
+offset_bottom = 112.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_node_slot")
+
+[node name="ColorIndicator" type="ColorRect" parent="CanvasLayer/LeftPanel/Card4_DeckSlots/DeckSlot1"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 6.0
+offset_bottom = 80.0
+color = Color(1, 0.2, 0.2, 1)
+
+[node name="Label" type="Label" parent="CanvasLayer/LeftPanel/Card4_DeckSlots/DeckSlot1"]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 16.0
+offset_top = -8.0
+offset_right = 170.0
+offset_bottom = 8.0
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "비어있음"
+vertical_alignment = 1
+
+[node name="DeckSlot2" type="Panel" parent="CanvasLayer/LeftPanel/Card4_DeckSlots"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 12.0
+offset_top = 124.0
+offset_right = 188.0
+offset_bottom = 204.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_node_slot")
+
+[node name="ColorIndicator" type="ColorRect" parent="CanvasLayer/LeftPanel/Card4_DeckSlots/DeckSlot2"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 6.0
+offset_bottom = 80.0
+color = Color(1, 0.2, 0.2, 1)
+
+[node name="Label" type="Label" parent="CanvasLayer/LeftPanel/Card4_DeckSlots/DeckSlot2"]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 16.0
+offset_top = -8.0
+offset_right = 170.0
+offset_bottom = 8.0
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "비어있음"
+vertical_alignment = 1
+
+[node name="DeckSlot3" type="Panel" parent="CanvasLayer/LeftPanel/Card4_DeckSlots"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 12.0
+offset_top = 216.0
+offset_right = 188.0
+offset_bottom = 296.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_node_slot")
+
+[node name="ColorIndicator" type="ColorRect" parent="CanvasLayer/LeftPanel/Card4_DeckSlots/DeckSlot3"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 6.0
+offset_bottom = 80.0
+color = Color(1, 0.2, 0.2, 1)
+
+[node name="Label" type="Label" parent="CanvasLayer/LeftPanel/Card4_DeckSlots/DeckSlot3"]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 16.0
+offset_top = -8.0
+offset_right = 170.0
+offset_bottom = 8.0
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "비어있음"
+vertical_alignment = 1
+
+[node name="GameArea" type="ColorRect" parent="CanvasLayer"]
+layout_mode = 3
+anchors_preset = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 220.0
+offset_top = 40.0
+offset_right = 1640.0
+offset_bottom = 1080.0
+color = Color(0.101961, 0, 0, 1)
+
+[node name="Coffin" type="ColorRect" parent="CanvasLayer/GameArea"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 670.0
+offset_top = 460.0
+offset_right = 750.0
+offset_bottom = 580.0
+color = Color(1, 1, 1, 1)
+
+[node name="RightPanel" type="Panel" parent="CanvasLayer"]
+layout_mode = 3
+anchors_preset = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 1640.0
+offset_top = 40.0
+offset_right = 1920.0
+offset_bottom = 1080.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_rightpanel")
+
+[node name="VelmireFacecam" type="ColorRect" parent="CanvasLayer/RightPanel"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 280.0
+offset_bottom = 320.0
+color = Color(0.05098, 0, 0, 1)
+
+[node name="FacecamBorder" type="ColorRect" parent="CanvasLayer/RightPanel/VelmireFacecam"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 319.0
+offset_right = 280.0
+offset_bottom = 320.0
+color = Color(1, 0.2, 0.2, 1)
+
+[node name="FacecamPlaceholder" type="Panel" parent="CanvasLayer/RightPanel/VelmireFacecam"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 90.0
+offset_top = 110.0
+offset_right = 190.0
+offset_bottom = 210.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_facecam_circle")
+
+[node name="VelmireLabel" type="Label" parent="CanvasLayer/RightPanel/VelmireFacecam"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 90.0
+offset_top = 295.0
+offset_right = 190.0
+offset_bottom = 316.0
+theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 12
+text = "VELMIRE"
+horizontal_alignment = 1
+
+[node name="ChatBox" type="Panel" parent="CanvasLayer/RightPanel"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 320.0
+offset_right = 280.0
+offset_bottom = 1040.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_chatbox")
+
+[node name="ChatLabel" type="Label" parent="CanvasLayer/RightPanel/ChatBox"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 16.0
+offset_top = 10.0
+offset_right = 120.0
+offset_bottom = 34.0
+theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 14
+text = "💬 채팅"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="CanvasLayer/RightPanel/ChatBox"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 40.0
+offset_right = 280.0
+offset_bottom = 710.0
+
+[node name="ChatLog" type="VBoxContainer" parent="CanvasLayer/RightPanel/ChatBox/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CoffinHPBar" type="Control" parent="CanvasLayer"]
+visible = false
+layout_mode = 3
+anchors_preset = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 460.0
+offset_top = 1055.0
+offset_right = 1260.0
+offset_bottom = 1071.0
+
+[node name="HPBarBG" type="ColorRect" parent="CanvasLayer/CoffinHPBar"]
+layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -27,87 +662,15 @@ offset_right = 0.0
 offset_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.101961, 0, 0, 1)
+color = Color(0.227451, 0, 0, 1)
 
-[node name="TopBar" type="Panel" parent="CanvasLayer"]
-layout_mode = 3
-anchors_preset = 0
-offset_right = 1920.0
-offset_bottom = 50.0
-theme_override_styles/panel = SubResource("StyleBoxFlat_topbar")
-
-[node name="LiveLabel" type="Label" parent="CanvasLayer/TopBar"]
+[node name="HPFill" type="ColorRect" parent="CanvasLayer/CoffinHPBar"]
 layout_mode = 1
-anchors_preset = 4
-anchor_top = 0.5
-anchor_bottom = 0.5
-offset_left = 20.0
-offset_top = -12.0
-offset_right = 400.0
-offset_bottom = 12.0
-grow_vertical = 2
-theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
-text = "🔴 LIVE | VELMIRE : BLOODCAST"
-vertical_alignment = 1
-
-[node name="Coffin" type="ColorRect" parent="CanvasLayer"]
-layout_mode = 3
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -40.0
-offset_top = -60.0
-offset_right = 40.0
-offset_bottom = 60.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = 0.0
+offset_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(1, 1, 1, 1)
-
-[node name="ChatBox" type="Panel" parent="CanvasLayer"]
-layout_mode = 3
-anchors_preset = 0
-offset_left = 1540.0
-offset_top = 50.0
-offset_right = 1920.0
-offset_bottom = 1030.0
-theme_override_styles/panel = SubResource("StyleBoxFlat_chatbox")
-
-[node name="ChatLabel" type="Label" parent="CanvasLayer/ChatBox"]
-layout_mode = 1
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -40.0
-offset_top = 20.0
-offset_right = 40.0
-offset_bottom = 44.0
-grow_horizontal = 2
-theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
-theme_override_font_sizes/font_size = 14
-text = "채팅"
-horizontal_alignment = 1
-
-[node name="BottomHUD" type="ColorRect" parent="CanvasLayer"]
-layout_mode = 3
-anchors_preset = 0
-offset_left = 0.0
-offset_top = 1030.0
-offset_right = 1920.0
-offset_bottom = 1080.0
-color = Color(0, 0, 0, 0.8)
-
-[node name="ResourceLabel" type="Label" parent="CanvasLayer/BottomHUD"]
-layout_mode = 1
-anchors_preset = 4
-anchor_top = 0.5
-anchor_bottom = 0.5
-offset_left = 20.0
-offset_top = -12.0
-offset_right = 300.0
-offset_bottom = 12.0
-grow_vertical = 2
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-text = "피: 0  |  특수재화: 0"
-vertical_alignment = 1
+color = Color(1, 0.2, 0.2, 1)
