@@ -92,18 +92,18 @@ func _draw() -> void:
 
 func take_damage(amount: float) -> void:
 	hp -= amount
-	_hp_bar_alpha = 1.0
-	_hp_bar_timer = _hp_bar_duration
 	_spawn_damage_number(amount)
 	if hp <= 0:
+		_spawn_death_effect()
 		_drop_blood()
 		remove_from_group("blood_entities")
 		queue_free()
-		return
-	var tween: Tween = create_tween()
-	tween.tween_interval(0.35)
-	tween.tween_property(self, "_damage_bar_ratio",
-		hp / max_hp, 0.3).set_ease(Tween.EASE_OUT)
+
+func _spawn_death_effect() -> void:
+	var effect = Node2D.new()
+	effect.set_script(preload("res://scripts/DeathEffect.gd"))
+	effect.global_position = global_position
+	get_parent().add_child(effect)
 
 func _drop_blood() -> void:
 	var drop_scene = preload("res://scenes/BloodDrop.tscn")

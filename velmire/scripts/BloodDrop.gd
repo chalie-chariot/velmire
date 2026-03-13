@@ -49,7 +49,8 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	var pulse: float = sin(_time * 3.0) * 0.8
-	draw_circle(Vector2.ZERO, _size + pulse,
+	var r: float = (_size + pulse) * 0.7  # 0.7배 크기
+	draw_circle(Vector2.ZERO, r,
 		Color(0.8, 0.0, 0.0, _alpha))
-	draw_circle(Vector2.ZERO, (_size + pulse) * 0.5,
+	draw_circle(Vector2.ZERO, r * 0.5,
 		Color(1.0, 0.2, 0.2, _alpha * 0.8))

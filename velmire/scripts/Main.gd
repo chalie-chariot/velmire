@@ -53,6 +53,10 @@ func _ready() -> void:
 	print("Main 시작")
 	var coffin_center: Vector2 = _coffin_rect.global_position + _coffin_rect.size / 2
 	$EntityLayer/HeartPulse.setup(coffin_center)
+	var coffin_particles: Node2D = Node2D.new()
+	coffin_particles.set_script(preload("res://scripts/CoffinParticles.gd"))
+	coffin_particles.setup(coffin_center)
+	$EntityLayer.add_child(coffin_particles)
 	$CanvasLayer/LeftPanel.modulate = Color(1, 1, 1, 0)
 	$CanvasLayer/RightPanel.modulate = Color(1, 1, 1, 0)
 	$CanvasLayer/LeftPanel.position = Vector2(-220, $CanvasLayer/LeftPanel.position.y)
