@@ -57,13 +57,30 @@ func try_connect(node: Node2D) -> void:
 			_connections.erase(conn)
 			_pending.is_pending_connection = false
 			_pending = null
+			_notify_synergy_engine()
 			queue_redraw()
 			return
 
 	_connections.append({from = _pending, to = node})
 	_pending.is_pending_connection = false
 	_pending = null
+	_notify_synergy_engine()
 	queue_redraw()
+
+func disconnect_node(node: Node2D) -> void:
+	_connections = _connections.filter(func(conn):
+		return conn.from != node and conn.to != node
+	)
+	if _pending == node:
+		_pending.is_pending_connection = false
+		_pending = null
+	_notify_synergy_engine()
+	queue_redraw()
+
+func _notify_synergy_engine() -> void:
+	var se = get_tree().get_first_node_in_group("synergy_engine")
+	if se and se.has_method("check_synergies"):
+		se.check_synergies(self)
 
 func get_connections_for(node: Node2D) -> Array:
 	var result: Array = []

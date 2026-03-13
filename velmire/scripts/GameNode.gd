@@ -14,6 +14,9 @@ var _drag_offset: Vector2 = Vector2.ZERO
 var _slot_position: Vector2 = Vector2.ZERO
 var attack_cooldown: float = 3.0
 var _attack_timer: float = 0.0
+var synergy_double_damage: bool = false
+var synergy_fast_cooldown: bool = false
+var synergy_wide_slow: bool = false
 var is_pending_connection: bool = false
 var _phase_offset: float = 0.0
 var is_hovered: bool = false
@@ -44,6 +47,16 @@ func _input(event: InputEvent) -> void:
 						cm.try_connect(self)
 					get_viewport().set_input_as_handled()
 				else:
+					if is_placed:
+						var cm = get_tree().get_first_node_in_group("connection_manager")
+						if cm:
+							cm.disconnect_node(self)
+						var grid = get_tree().get_first_node_in_group("heart_pulse")
+						if grid and grid_col >= 0 and grid_row >= 0:
+							grid.remove_node(grid_col, grid_row)
+						grid_col = -1
+						grid_row = -1
+					is_placed = false
 					is_dragging = true
 					_drag_offset = global_position - get_global_mouse_position()
 					_slot_position = global_position
@@ -232,22 +245,24 @@ func _attack_nearest_entity(damage: float) -> void:
 	if nearest and nearest_dist <= 200.0:
 		_spawn_attack_line(nearest.global_position)
 		if nearest.has_method("take_damage"):
-			nearest.take_damage(damage)
+			var final_damage: float = damage
+			if synergy_double_damage and nearest.has_method("is_slowed") and nearest.is_slowed():
+				final_damage *= 2.0
+			nearest.take_damage(final_damage)
 
 func _slow_nearest_entity() -> void:
+	var slow_range: float = 200.0
+	var slow_duration: float = 3.0
+	if synergy_wide_slow:
+		slow_range *= 2.0
+		slow_duration *= 2.0
+
 	var entities = get_tree().get_nodes_in_group("blood_entities")
-	var nearest: Node2D = null
-	var nearest_dist: float = INF
-
 	for e in entities:
-		var d: float = global_position.distance_to(e.global_position)
-		if d < nearest_dist:
-			nearest_dist = d
-			nearest = e
-
-	if nearest and nearest_dist <= 200.0 and nearest.has_method("apply_slow"):
-		_spawn_attack_line(nearest.global_position)
-		nearest.apply_slow(0.5, 3.0)
+		if global_position.distance_to(e.global_position) <= slow_range:
+			if e.has_method("apply_slow"):
+				_spawn_attack_line(e.global_position)
+				e.apply_slow(0.5, slow_duration)
 
 func _boost_adjacent_nodes() -> void:
 	var nodes = get_tree().get_nodes_in_group("game_nodes")

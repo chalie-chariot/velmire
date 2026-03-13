@@ -45,6 +45,8 @@ func _ready() -> void:
 	$CanvasLayer/RightTab.gui_input.connect(_on_right_tab_gui_input)
 	$CanvasLayer/CoffinHPBar.modulate = Color(1, 1, 1, 0)
 	_spawn_test_nodes()
+	var synergy_engine = SynergyEngine.new()
+	add_child(synergy_engine)
 
 func show_tooltip(info: Dictionary, node_color: Color) -> void:
 	_tip_name.text = info.name
