@@ -142,15 +142,20 @@ func _draw() -> void:
 			Color(node_color.r, node_color.g, node_color.b, 0.5), 2.0)
 
 	if Input.is_key_pressed(KEY_SHIFT) and is_placed:
-		draw_circle(Vector2.ZERO, 200.0,
-			Color(node_color.r, node_color.g, node_color.b, 0.12))
+		var rings: int = 40
+		for i in range(rings, 0, -1):
+			var t: float = float(i) / rings
+			var r: float = 200.0 * t
+			var alpha: float = t * t * 0.025
+			var fill_pts: PackedVector2Array = []
+			for j in range(64):
+				var a: float = (TAU / 64) * j
+				fill_pts.append(Vector2(cos(a), sin(a)) * r)
+			draw_colored_polygon(fill_pts,
+				Color(node_color.r, node_color.g, node_color.b, alpha))
 
-		var segments: int = 32
-		for i in range(segments):
-			var angle_a: float = (TAU / segments) * i
-			var angle_b: float = (TAU / segments) * (i + 0.6)
-			draw_arc(Vector2.ZERO, 200.0, angle_a, angle_b, 8,
-				Color(1.0, 1.0, 1.0, 0.25), 1.5)
+		draw_arc(Vector2.ZERO, 200.0, 0, TAU, 128,
+			Color(node_color.r, node_color.g, node_color.b, 0.6), 1.0)
 
 func _get_node_info() -> Dictionary:
 	match node_type:
