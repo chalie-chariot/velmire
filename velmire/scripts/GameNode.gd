@@ -16,6 +16,7 @@ var attack_cooldown: float = 3.0
 var _attack_timer: float = 0.0
 var is_pending_connection: bool = false
 var _phase_offset: float = 0.0
+var is_hovered: bool = false
 
 func _ready() -> void:
 	_generate_base_points()
@@ -63,6 +64,9 @@ func _process(delta: float) -> void:
 		if _attack_timer >= attack_cooldown:
 			_attack_timer = 0.0
 			_do_attack()
+
+	var mouse_dist: float = to_local(get_global_mouse_position()).length()
+	is_hovered = mouse_dist <= radius + 10.0
 
 	queue_redraw()
 
@@ -132,6 +136,52 @@ func _draw() -> void:
 			Color(1.0, 1.0, 1.0, pulse), 2.5)
 		draw_arc(Vector2.ZERO, radius * 1.3, 0, TAU, 64,
 			Color(node_color.r, node_color.g, node_color.b, pulse * 0.6), 1.5)
+
+	if is_hovered:
+		draw_arc(Vector2.ZERO, radius * 1.5, 0, TAU, 64,
+			Color(node_color.r, node_color.g, node_color.b, 0.5), 2.0)
+
+	if Input.is_key_pressed(KEY_SHIFT) and is_placed:
+		draw_circle(Vector2.ZERO, 200.0,
+			Color(node_color.r, node_color.g, node_color.b, 0.12))
+
+		var segments: int = 32
+		for i in range(segments):
+			var angle_a: float = (TAU / segments) * i
+			var angle_b: float = (TAU / segments) * (i + 0.6)
+			draw_arc(Vector2.ZERO, 200.0, angle_a, angle_b, 8,
+				Color(1.0, 1.0, 1.0, 0.25), 1.5)
+
+func _get_node_info() -> Dictionary:
+	match node_type:
+		"흡혈":
+			return {
+				name = "흡혈",
+				desc = "가장 가까운 혈체 공격",
+				synergy1 = "결계 연결: 데미지 2배",
+				synergy2 = "증폭 연결: 쿨다운 50%↓",
+				atk = 30,
+				cooldown = 3.0
+			}
+		"결계":
+			return {
+				name = "결계",
+				desc = "혈체 이동 감속",
+				synergy1 = "흡혈 연결: 데미지 2배",
+				synergy2 = "증폭 연결: 감속 범위 2배",
+				atk = 0,
+				cooldown = 3.0
+			}
+		"증폭":
+			return {
+				name = "증폭",
+				desc = "인접 노드 강화",
+				synergy1 = "흡혈 연결: 쿨다운 50%↓",
+				synergy2 = "결계 연결: 감속 범위 2배",
+				atk = 0,
+				cooldown = 3.0
+			}
+	return {name = "", desc = "", synergy1 = "", synergy2 = "", atk = 0, cooldown = 0.0}
 
 func _try_place_on_grid() -> void:
 	var grid = get_tree().get_first_node_in_group("heart_pulse")

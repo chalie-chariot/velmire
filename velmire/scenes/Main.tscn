@@ -911,3 +911,128 @@ mouse_filter = 2
 modulate = Color(1, 1, 1, 0)
 material = SubResource("ShaderMaterial_vignette")
 color = Color(0.8, 0, 0, 1)
+
+[node name="TooltipBar" type="ColorRect" parent="CanvasLayer"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 940.0
+offset_right = 1920.0
+offset_bottom = 1080.0
+visible = false
+color = Color(0.05098, 0, 0, 0.92)
+
+[node name="TopBorder" type="ColorRect" parent="CanvasLayer/TooltipBar"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 1920.0
+offset_bottom = 2.0
+color = Color(1, 0.2, 0.2, 1)
+
+[node name="NodeName" type="Label" parent="CanvasLayer/TooltipBar"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 60.0
+offset_top = 20.0
+offset_right = 720.0
+offset_bottom = 55.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 32
+text = ""
+
+[node name="NodeDesc" type="Label" parent="CanvasLayer/TooltipBar"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 60.0
+offset_top = 65.0
+offset_right = 720.0
+offset_bottom = 95.0
+theme_override_colors/font_color = Color(0.733333, 0.733333, 0.733333, 1)
+theme_override_font_sizes/font_size = 18
+text = ""
+
+[node name="Divider1" type="ColorRect" parent="CanvasLayer/TooltipBar"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 740.0
+offset_top = 10.0
+offset_right = 742.0
+offset_bottom = 130.0
+color = Color(1, 0.2, 0.2, 0.4)
+
+[node name="SynergyTitle" type="Label" parent="CanvasLayer/TooltipBar"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 760.0
+offset_top = 20.0
+offset_right = 900.0
+offset_bottom = 42.0
+theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 16
+text = "[ 시너지 ]"
+
+[node name="Synergy1" type="Label" parent="CanvasLayer/TooltipBar"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 760.0
+offset_top = 50.0
+offset_right = 1260.0
+offset_bottom = 72.0
+theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 18
+text = ""
+
+[node name="Synergy2" type="Label" parent="CanvasLayer/TooltipBar"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 760.0
+offset_top = 85.0
+offset_right = 1260.0
+offset_bottom = 107.0
+theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 18
+text = ""
+
+[node name="Divider2" type="ColorRect" parent="CanvasLayer/TooltipBar"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 1280.0
+offset_top = 10.0
+offset_right = 1282.0
+offset_bottom = 130.0
+color = Color(1, 0.2, 0.2, 0.4)
+
+[node name="StatTitle" type="Label" parent="CanvasLayer/TooltipBar"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 1300.0
+offset_top = 20.0
+offset_right = 1440.0
+offset_bottom = 42.0
+theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 16
+text = "[ 스탯 ]"
+
+[node name="StatATK" type="Label" parent="CanvasLayer/TooltipBar"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 1300.0
+offset_top = 50.0
+offset_right = 1900.0
+offset_bottom = 72.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = ""
+
+[node name="StatCooldown" type="Label" parent="CanvasLayer/TooltipBar"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 1300.0
+offset_top = 85.0
+offset_right = 1900.0
+offset_bottom = 107.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = ""

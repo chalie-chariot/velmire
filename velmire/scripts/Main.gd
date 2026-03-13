@@ -4,6 +4,13 @@ extends Node2D
 @onready var _coffin_rect: ColorRect = $CanvasLayer/Coffin
 @onready var _vignette: ColorRect = $CanvasLayer/VignetteOverlay
 @onready var _live_dot: Label = $CanvasLayer/TopBar/LiveDot
+@onready var _tooltip: ColorRect = $CanvasLayer/TooltipBar
+@onready var _tip_name: Label = $CanvasLayer/TooltipBar/NodeName
+@onready var _tip_desc: Label = $CanvasLayer/TooltipBar/NodeDesc
+@onready var _tip_syn1: Label = $CanvasLayer/TooltipBar/Synergy1
+@onready var _tip_syn2: Label = $CanvasLayer/TooltipBar/Synergy2
+@onready var _stat_atk: Label = $CanvasLayer/TooltipBar/StatATK
+@onready var _stat_cd: Label = $CanvasLayer/TooltipBar/StatCooldown
 var _left_tween: Tween
 var _right_tween: Tween
 var _hp_tween: Tween
@@ -25,6 +32,7 @@ var _shake_duration: float = 0.0
 var _vignette_tween: Tween
 
 func _ready() -> void:
+	add_to_group("main")
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	print("Main 시작")
 	var coffin_center: Vector2 = _coffin_rect.global_position + _coffin_rect.size / 2
@@ -37,6 +45,26 @@ func _ready() -> void:
 	$CanvasLayer/RightTab.gui_input.connect(_on_right_tab_gui_input)
 	$CanvasLayer/CoffinHPBar.modulate = Color(1, 1, 1, 0)
 	_spawn_test_nodes()
+
+func show_tooltip(info: Dictionary, node_color: Color) -> void:
+	_tip_name.text = info.name
+	_tip_desc.text = info.desc
+	_tip_syn1.text = "◆ " + info.synergy1
+	_tip_syn2.text = "◆ " + info.synergy2
+	_stat_atk.text = "⚔ 공격력: " + str(info.atk)
+	_stat_cd.text = "⏱ 쿨다운: " + str(info.cooldown) + "s"
+	_tip_syn1.add_theme_color_override("font_color", node_color.lightened(0.3))
+	_tip_syn2.add_theme_color_override("font_color", node_color.lightened(0.3))
+	_tooltip.visible = true
+
+func hide_tooltip() -> void:
+	_tooltip.visible = false
+
+func _get_hovered_game_node():
+	for n in get_tree().get_nodes_in_group("game_nodes"):
+		if n.is_hovered:
+			return n
+	return null
 
 func _process(delta: float) -> void:
 	if _is_game_over:
@@ -66,6 +94,12 @@ func _process(delta: float) -> void:
 		if _hp_hide_timer <= 0.0:
 			_hp_visible = false
 			_fade_hp_bar(false)
+
+	var hovered_node = _get_hovered_game_node()
+	if hovered_node:
+		show_tooltip(hovered_node._get_node_info(), hovered_node.node_color)
+	else:
+		hide_tooltip()
 
 	_apply_shake(delta)
 
