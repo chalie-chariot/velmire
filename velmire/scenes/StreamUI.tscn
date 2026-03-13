@@ -1,0 +1,111 @@
+[gd_scene load_steps=3 format=3 uid="uid://b3streamui001"]
+
+[ext_resource type="Script" path="res://scripts/ChatManager.gd" id="1_chat"]
+
+[sub_resource type="PlaceholderTexture2D" id="PlaceholderTexture2D_1"]
+size = Vector2(120, 90)
+
+[node name="StreamUI" type="Node"]
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+layer = 0
+
+[node name="TopBar" type="HBoxContainer" parent="CanvasLayer"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 40.0
+grow_horizontal = 2
+theme_override_constants/separation = 20
+
+[node name="LiveLabel" type="Label" parent="CanvasLayer/TopBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
+text = "🔴 LIVE | VELMIRE : BLOODCAST"
+
+[node name="ViewersCount" type="Label" parent="CanvasLayer/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 8
+text = "0 viewers"
+
+[node name="ChatBox" type="VBoxContainer" parent="CanvasLayer"]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 0.8
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 50.0
+offset_right = -10.0
+offset_bottom = -80.0
+grow_horizontal = 0
+grow_vertical = 2
+
+[node name="ScrollContainer" type="ScrollContainer" parent="CanvasLayer/ChatBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ChatLog" type="VBoxContainer" parent="CanvasLayer/ChatBox/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+[node name="HUD" type="HBoxContainer" parent="CanvasLayer"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -40.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 20
+
+[node name="BloodDisplay" type="Label" parent="CanvasLayer/HUD"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "🩸 0"
+
+[node name="SpecialDisplay" type="Label" parent="CanvasLayer/HUD"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "✨ 0"
+
+[node name="TimerDisplay" type="Label" parent="CanvasLayer/HUD"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "⏱ 0"
+
+[node name="NodeSlotsDisplay" type="Label" parent="CanvasLayer/HUD"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "📦 0"
+
+[node name="VelmireReaction" type="TextureRect" parent="CanvasLayer"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 0.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -130.0
+offset_right = 130.0
+offset_bottom = -40.0
+grow_horizontal = 0
+grow_vertical = 0
+texture = SubResource("PlaceholderTexture2D_1")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ChatManager" type="Node" parent="."]
+script = ExtResource("1_chat")

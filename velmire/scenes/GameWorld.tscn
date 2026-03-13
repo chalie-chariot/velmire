@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://b2gameworld001"]
+
+[ext_resource type="PackedScene" uid="uid://b6coffin001" path="res://scenes/Coffin.tscn" id="1_coffin"]
+
+[node name="GameWorld" type="Node2D"]
+
+[node name="Coffin" parent="." instance=ExtResource("1_coffin")]
+position = Vector2(960, 540)

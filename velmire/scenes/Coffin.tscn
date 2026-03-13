@@ -1,0 +1,47 @@
+[gd_scene load_steps=5 format=3 uid="uid://b6coffin001"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
+size = Vector2(50, 50)
+
+[sub_resource type="PlaceholderTexture2D" id="PlaceholderTexture2D_1"]
+size = Vector2(100, 100)
+
+[sub_resource type="GDScript" id="GDScript_coffin"]
+script/source = "extends Area2D
+
+signal coffin_damaged(current_hp: float, max_hp: float)
+signal game_over
+
+@export var max_hp: float = 100.0
+var current_hp: float = 100.0
+
+func _ready() -> void:
+	print("Coffin 시작")
+	current_hp = max_hp
+	body_entered.connect(_on_body_entered)
+
+func _on_body_entered(body: Node2D) -> void:
+	var script_res = body.get_script()
+	if script_res is GDScript and (script_res as GDScript).get_global_name() == \"BloodEntityAI\":
+		var entity_data: Dictionary = body.get(\"entity_data\") if body.get(\"entity_data\") else {}
+		var damage: float = float(entity_data.get(\"damage\", 10))
+		take_damage(damage)
+		body.queue_free()
+
+func take_damage(amount: float) -> void:
+	current_hp -= amount
+	coffin_damaged.emit(current_hp, max_hp)
+	if current_hp <= 0:
+		game_over.emit()
+"
+
+[node name="Coffin" type="Area2D"]
+script = SubResource("GDScript_coffin")
+max_hp = 100.0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_1")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = SubResource("PlaceholderTexture2D_1")
+modulate = Color(0.3, 0.2, 0.2, 1)

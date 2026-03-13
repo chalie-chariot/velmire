@@ -1,0 +1,42 @@
+[
+  {
+    "id": "bloodfreeze",
+    "node_a": "absorb",
+    "node_b": "freeze",
+    "name": "혈빙",
+    "effect": "빙결 상태 혈체 피해량 3배",
+    "color": "#AA00FF"
+  },
+  {
+    "id": "bloodpetrify",
+    "node_a": "absorb",
+    "node_b": "petrify",
+    "name": "혈석",
+    "effect": "석화 상태 혈체 피해 시 추가 피 흡수",
+    "color": "#AA00FF"
+  },
+  {
+    "id": "freezepetrify",
+    "node_a": "freeze",
+    "node_b": "petrify",
+    "name": "빙석",
+    "effect": "빙결+석화 동시 부여 시 지속시간 2배",
+    "color": "#0066AA"
+  },
+  {
+    "id": "resonanceconvert",
+    "node_a": "resonance",
+    "node_b": "convert",
+    "name": "공변",
+    "effect": "변환 효율 50% 증폭",
+    "color": "#00CC66"
+  },
+  {
+    "id": "aoefreeze",
+    "node_a": "aoe_absorb",
+    "node_b": "freeze",
+    "name": "광혈빙",
+    "effect": "광역 흡혈 시 빙결 범위 확대",
+    "color": "#AA00FF"
+  }
+]

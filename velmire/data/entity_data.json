@@ -1,0 +1,20 @@
+[
+  {
+    "id": "normal",
+    "speed": 60,
+    "hp": 30,
+    "damage": 10,
+    "drop": "blood",
+    "color": "#CC0000",
+    "radius": 20
+  },
+  {
+    "id": "enhanced",
+    "speed": 45,
+    "hp": 80,
+    "damage": 25,
+    "drop": "blood",
+    "color": "#FF3333",
+    "radius": 28
+  }
+]

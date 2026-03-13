@@ -1,0 +1,44 @@
+[
+  {
+    "id": "absorb",
+    "type": "흡혈",
+    "color": "#FF3333",
+    "solo_effect": "전방 직선 혈체 피해 + 피 흡수",
+    "cooldown": 3.0
+  },
+  {
+    "id": "aoe_absorb",
+    "type": "흡혈",
+    "color": "#FF3333",
+    "solo_effect": "주변 광역 혈체 피해 + 피 흡수",
+    "cooldown": 5.0
+  },
+  {
+    "id": "freeze",
+    "type": "결계",
+    "color": "#3333FF",
+    "solo_effect": "대상 빙결 상태 부여",
+    "cooldown": 4.0
+  },
+  {
+    "id": "petrify",
+    "type": "결계",
+    "color": "#3333FF",
+    "solo_effect": "대상 석화 상태 부여",
+    "cooldown": 4.0
+  },
+  {
+    "id": "resonance",
+    "type": "증폭",
+    "color": "#33FF33",
+    "solo_effect": "연결된 노드 효과 증폭",
+    "cooldown": 2.0
+  },
+  {
+    "id": "convert",
+    "type": "증폭",
+    "color": "#33FF33",
+    "solo_effect": "자원 타입 변환",
+    "cooldown": 6.0
+  }
+]
