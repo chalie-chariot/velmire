@@ -3,6 +3,7 @@ extends Node2D
 @onready var blood_entity_scene = preload("res://scenes/BloodEntity.tscn")
 @onready var _coffin_rect: ColorRect = $CanvasLayer/Coffin
 @onready var _vignette: ColorRect = $CanvasLayer/VignetteOverlay
+@onready var _live_dot: Label = $CanvasLayer/TopBar/LiveDot
 var _left_tween: Tween
 var _right_tween: Tween
 var _hp_tween: Tween
@@ -16,6 +17,8 @@ var coffin_hp: float = 100.0
 var coffin_max_hp: float = 100.0
 var _hp_hide_timer: float = 0.0
 var _hp_visible: bool = false
+var _blink_timer: float = 0.0
+var _blink_state: bool = true
 var _is_game_over: bool = false
 var _shake_intensity: float = 0.0
 var _shake_duration: float = 0.0
@@ -36,6 +39,17 @@ func _process(delta: float) -> void:
 	if _is_game_over:
 		_apply_shake(delta)
 		return
+	_blink_timer += delta
+	if _blink_timer >= 0.8:
+		_blink_timer = 0.0
+		_blink_state = !_blink_state
+		_live_dot.modulate.a = 1.0 if _blink_state else 0.2
+	if coffin_hp >= 45:
+		_live_dot.add_theme_color_override("font_color", Color(0, 1, 0.267, 1))
+	elif coffin_hp >= 13:
+		_live_dot.add_theme_color_override("font_color", Color(1, 1, 0, 1))
+	else:
+		_live_dot.add_theme_color_override("font_color", Color(1, 0, 0, 1))
 	spawn_timer += delta
 	if spawn_timer >= spawn_interval:
 		spawn_timer = 0.0
@@ -174,6 +188,8 @@ func _fade_hp_bar(show: bool) -> void:
 
 func _game_over() -> void:
 	_is_game_over = true
+	_live_dot.modulate.a = 1.0
+	_live_dot.add_theme_color_override("font_color", Color(0.8, 0.0, 0.0, 1.0))
 	get_tree().paused = true
 
 	var overlay: ColorRect = ColorRect.new()
