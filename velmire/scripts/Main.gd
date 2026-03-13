@@ -16,11 +16,13 @@ var coffin_hp: float = 100.0
 var coffin_max_hp: float = 100.0
 var _hp_hide_timer: float = 0.0
 var _hp_visible: bool = false
+var _is_game_over: bool = false
 var _shake_intensity: float = 0.0
 var _shake_duration: float = 0.0
 var _vignette_tween: Tween
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	print("Main 시작")
 	$CanvasLayer/LeftPanel.modulate = Color(1, 1, 1, 0)
 	$CanvasLayer/RightPanel.modulate = Color(1, 1, 1, 0)
@@ -31,6 +33,9 @@ func _ready() -> void:
 	$CanvasLayer/CoffinHPBar.modulate = Color(1, 1, 1, 0)
 
 func _process(delta: float) -> void:
+	if _is_game_over:
+		_apply_shake(delta)
+		return
 	spawn_timer += delta
 	if spawn_timer >= spawn_interval:
 		spawn_timer = 0.0
@@ -75,7 +80,7 @@ func _check_coffin_collision() -> void:
 			coffin_hp = max(coffin_hp, 0.0)
 			_trigger_shake()
 			_trigger_vignette()
-			_trigger_shockwave()
+			_trigger_shockwave(entity.global_position)
 			_show_hp_bar()
 			if coffin_hp <= 0.0:
 				_game_over()
@@ -128,11 +133,33 @@ func _trigger_vignette() -> void:
 	_vignette_tween.tween_property(_vignette, "modulate", Color(1, 1, 1, 0.7), 0.05).set_ease(Tween.EASE_OUT)
 	_vignette_tween.tween_property(_vignette, "modulate", Color(1, 1, 1, 0), 0.4).set_ease(Tween.EASE_IN)
 
-func _trigger_shockwave() -> void:
-	var ring: Node2D = Node2D.new()
-	ring.set_script(preload("res://scripts/ShockwaveRing.gd"))
-	$EntityLayer.add_child(ring)
-	ring.global_position = _coffin_rect.global_position + _coffin_rect.size / 2
+func _trigger_shockwave(hit_pos: Vector2) -> void:
+	var coffin_center: Vector2 = _coffin_rect.global_position + _coffin_rect.size / 2
+
+	for i in range(12):
+		var shard: Node2D = Node2D.new()
+		shard.set_script(preload("res://scripts/ShockwaveShardEffect.gd"))
+		var base_angle: float = (hit_pos - coffin_center).angle()
+		var spread: float = randf_range(-PI * 0.25, PI * 0.25)
+		var angle: float = base_angle + spread
+		var speed: float = randf_range(500.0, 850.0)
+		var size: float = randf_range(4.0, 12.0)
+		shard.set("_vel", Vector2(cos(angle), sin(angle)) * speed)
+		shard.set("_size", size)
+		shard.set("_origin", hit_pos)
+		shard.set("_spread_sign", 1.0 if spread >= 0 else -1.0)
+		$EntityLayer.add_child(shard)
+		shard.global_position = hit_pos
+
+	var flash: ColorRect = ColorRect.new()
+	flash.color = Color(1.0, 0.3, 0.3, 0.5)
+	flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	flash.set_offsets_preset(Control.PRESET_FULL_RECT)
+	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	$CanvasLayer.add_child(flash)
+	var tween: Tween = create_tween()
+	tween.tween_property(flash, "color", Color(1.0, 0.3, 0.3, 0.0), 0.12).set_ease(Tween.EASE_OUT)
+	tween.tween_callback(flash.queue_free)
 
 func _fade_hp_bar(show: bool) -> void:
 	if _hp_tween:
@@ -146,13 +173,80 @@ func _fade_hp_bar(show: bool) -> void:
 	).set_ease(Tween.EASE_OUT)
 
 func _game_over() -> void:
+	_is_game_over = true
 	get_tree().paused = true
-	var label: Label = Label.new()
-	label.text = "GAME OVER"
-	label.add_theme_font_size_override("font_size", 72)
-	label.add_theme_color_override("font_color", Color.WHITE)
-	label.set_anchors_preset(Control.PRESET_CENTER)
-	$CanvasLayer.add_child(label)
+
+	var overlay: ColorRect = ColorRect.new()
+	overlay.color = Color(0.05, 0.0, 0.0, 0.0)
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	$CanvasLayer.add_child(overlay)
+
+	var tween: Tween = create_tween()
+	tween.tween_property(overlay, "color", Color(0.05, 0.0, 0.0, 0.85), 1.0).set_ease(Tween.EASE_OUT)
+
+	await tween.finished
+
+	var shader_mat: ShaderMaterial = ShaderMaterial.new()
+	var shader: Shader = Shader.new()
+	shader.code = """
+shader_type canvas_item;
+uniform sampler2D screen_texture : hint_screen_texture, repeat_disable, filter_nearest;
+uniform float amount : hint_range(0.0, 1.0) = 0.0;
+void fragment() {
+	vec4 col = textureLod(screen_texture, SCREEN_UV, 0.0);
+	float gray = dot(col.rgb, vec3(0.299, 0.587, 0.114));
+	COLOR = vec4(mix(col.rgb, vec3(gray), amount), col.a);
+}
+"""
+	shader_mat.shader = shader
+
+	var bw_overlay: ColorRect = ColorRect.new()
+	bw_overlay.color = Color(1, 1, 1, 1)
+	bw_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bw_overlay.set_offsets_preset(Control.PRESET_FULL_RECT)
+	bw_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bw_overlay.material = shader_mat
+	$CanvasLayer.add_child(bw_overlay)
+
+	var tween_bw: Tween = create_tween()
+	tween_bw.tween_method(
+		func(v: float): shader_mat.set_shader_parameter("amount", v),
+		0.0, 1.0, 1.5
+	).set_ease(Tween.EASE_OUT)
+
+	var coffin_center: Vector2 = _coffin_rect.global_position + _coffin_rect.size / 2
+
+	var label1: Label = Label.new()
+	label1.text = "...아직은 아니야"
+	label1.add_theme_font_size_override("font_size", 36)
+	label1.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 0.0))
+	label1.position = coffin_center + Vector2(-120, -80)
+	$CanvasLayer.add_child(label1)
+
+	var tween2: Tween = create_tween()
+	tween2.tween_property(label1, "theme_override_colors/font_color", Color(0.8, 0.8, 0.8, 1.0), 0.8)
+	await tween2.finished
+	await get_tree().create_timer(1.2).timeout
+
+	var label2: Label = Label.new()
+	label2.text = "GAME OVER"
+	label2.add_theme_font_size_override("font_size", 72)
+	label2.add_theme_color_override("font_color", Color(1.0, 0.1, 0.1, 0.0))
+	label2.position = coffin_center + Vector2(-240, -30)
+	$CanvasLayer.add_child(label2)
+
+	var tween3: Tween = create_tween()
+	tween3.tween_property(label2, "theme_override_colors/font_color", Color(1.0, 0.1, 0.1, 1.0), 0.6)
+	await tween3.finished
+	await get_tree().create_timer(1.5).timeout
+
+	var label3: Label = Label.new()
+	label3.text = "[ R ] 재시작"
+	label3.add_theme_font_size_override("font_size", 20)
+	label3.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
+	label3.position = coffin_center + Vector2(-60, 60)
+	$CanvasLayer.add_child(label3)
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed:
@@ -169,6 +263,10 @@ func _input(event: InputEvent) -> void:
 			else:
 				_slide_right_open()
 			_right_open = !_right_open
+
+		if event.keycode == KEY_R and _is_game_over:
+			get_tree().paused = false
+			get_tree().reload_current_scene()
 
 func _on_left_tab_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:

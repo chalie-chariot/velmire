@@ -1,6 +1,6 @@
 extends Node2D
 
-var speed: float = 60.0
+var speed: float = 90.0
 var hp: float = 30.0
 var damage: float = 10.0
 var target: Vector2 = Vector2(960, 540)
