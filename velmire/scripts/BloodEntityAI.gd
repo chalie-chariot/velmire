@@ -47,3 +47,15 @@ func _draw() -> void:
 		var a: Vector2 = smooth[i]
 		var b: Vector2 = smooth[(i + 1) % smooth.size()]
 		draw_line(a, b, Color(0.6, 0.05, 0.05, 1.0), 1.5)
+
+func take_damage(amount: float) -> void:
+	hp -= amount
+	if hp <= 0:
+		remove_from_group("blood_entities")
+		queue_free()
+
+func apply_slow(factor: float, duration: float) -> void:
+	speed *= factor
+	await get_tree().create_timer(duration).timeout
+	if is_inside_tree():
+		speed /= factor

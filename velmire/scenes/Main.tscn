@@ -1,7 +1,8 @@
-[gd_scene load_steps=24 format=3 uid="uid://b1main001"]
+[gd_scene load_steps=25 format=3 uid="uid://b1main001"]
 
 [ext_resource type="Script" path="res://scripts/Main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/HeartPulse.tscn" id="2_heartpulse"]
+[ext_resource type="Script" path="res://scripts/ConnectionManager.gd" id="3_conn"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_topbar"]
 bg_color = Color(0.05098, 0, 0, 0.8)
@@ -108,6 +109,9 @@ color = Color(0.101961, 0, 0, 1)
 [node name="EntityLayer" type="Node2D" parent="."]
 
 [node name="HeartPulse" parent="EntityLayer" instance=ExtResource("2_heartpulse")]
+
+[node name="ConnectionManager" type="Node2D" parent="EntityLayer"]
+script = ExtResource("3_conn")
 
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 layer = 1
