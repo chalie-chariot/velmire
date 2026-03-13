@@ -27,6 +27,8 @@ var _vignette_tween: Tween
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	print("Main 시작")
+	var coffin_center: Vector2 = _coffin_rect.global_position + _coffin_rect.size / 2
+	$EntityLayer/HeartPulse.setup(coffin_center)
 	$CanvasLayer/LeftPanel.modulate = Color(1, 1, 1, 0)
 	$CanvasLayer/RightPanel.modulate = Color(1, 1, 1, 0)
 	$CanvasLayer/LeftPanel.position = Vector2(-220, $CanvasLayer/LeftPanel.position.y)

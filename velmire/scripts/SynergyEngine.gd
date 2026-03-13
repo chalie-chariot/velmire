@@ -39,7 +39,7 @@ func _connect_to_connection_source() -> void:
 
 
 func _find_node_grid() -> Node:
-	return _find_node_of_type("NodeGrid")
+	return _find_node_of_type("HeartPulse")
 
 
 func _find_connection_manager() -> Node:

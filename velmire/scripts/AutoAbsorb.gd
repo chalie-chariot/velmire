@@ -37,7 +37,7 @@ func _connect_signals() -> void:
 	if _synergy_engine and _synergy_engine.has_signal("synergy_activated"):
 		_synergy_engine.synergy_activated.connect(_on_synergy_activated)
 	
-	_node_grid = _find_node_of_type("NodeGrid")
+	_node_grid = _find_node_of_type("HeartPulse")
 	if _node_grid and _node_grid.has_signal("connection_made"):
 		_node_grid.connection_made.connect(_on_connection_made)
 	

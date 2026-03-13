@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://bxi8mnes2kemi"]
+
+[ext_resource type="Script" path="res://scripts/HeartPulse.gd" id="1_heartpulse"]
+
+[node name="HeartPulse" type="Node2D"]
+script = ExtResource("1_heartpulse")
