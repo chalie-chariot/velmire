@@ -185,7 +185,23 @@ text = "00:00"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="Coffin" type="ColorRect" parent="CanvasLayer"]
+[node name="BloodLabel" type="Label" parent="CanvasLayer/TopBar"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = -120.0
+offset_top = 6.0
+offset_right = -16.0
+offset_bottom = 34.0
+grow_horizontal = 0
+theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 17
+text = "🩸 0"
+
+[node name="Coffin" type="ColorRect" parent="CanvasLayer" groups=["coffin"]]
 layout_mode = 1
 anchors_preset = 0
 offset_left = 920.0

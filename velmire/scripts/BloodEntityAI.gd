@@ -96,6 +96,7 @@ func take_damage(amount: float) -> void:
 	_hp_bar_timer = _hp_bar_duration
 	_spawn_damage_number(amount)
 	if hp <= 0:
+		_drop_blood()
 		remove_from_group("blood_entities")
 		queue_free()
 		return
@@ -103,6 +104,19 @@ func take_damage(amount: float) -> void:
 	tween.tween_interval(0.35)
 	tween.tween_property(self, "_damage_bar_ratio",
 		hp / max_hp, 0.3).set_ease(Tween.EASE_OUT)
+
+func _drop_blood() -> void:
+	var drop_scene = preload("res://scenes/BloodDrop.tscn")
+	# 크기에 비례한 드롭 수
+	var drop_count: int = 3
+	var coffin_center = get_tree().get_first_node_in_group("coffin")
+	if not coffin_center:
+		return
+	var target: Vector2 = coffin_center.global_position + coffin_center.size / 2
+	for i in range(drop_count):
+		var drop = drop_scene.instantiate()
+		get_parent().add_child(drop)
+		drop.setup(global_position, 1.0, target)
 
 func _spawn_damage_number(amount: float) -> void:
 	var label: Label = Label.new()

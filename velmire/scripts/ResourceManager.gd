@@ -17,6 +17,15 @@ func apply_synergy_effect(synergy: Dictionary, effect_data: Dictionary, position
 	pass
 
 
+func add_blood(amount: float) -> void:
+	blood += amount
+	resource_changed.emit("blood", blood)
+	# TopBar 재화 표시 업데이트
+	var main = get_tree().get_first_node_in_group("main")
+	if main:
+		main.update_blood_ui(blood)
+
+
 func add_resource(type: String, amount: float) -> void:
 	match type:
 		"blood":

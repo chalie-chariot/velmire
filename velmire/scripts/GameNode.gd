@@ -225,7 +225,7 @@ func _return_to_slot() -> void:
 func _do_attack() -> void:
 	match node_type:
 		"흡혈":
-			_attack_nearest_entity(30.0)
+			_attack_nearest_entity(999.0)
 		"결계":
 			_slow_nearest_entity()
 		"증폭":

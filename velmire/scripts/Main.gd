@@ -4,6 +4,7 @@ extends Node2D
 @onready var _coffin_rect: ColorRect = $CanvasLayer/Coffin
 @onready var _vignette: ColorRect = $CanvasLayer/VignetteOverlay
 @onready var _live_dot: Label = $CanvasLayer/TopBar/LiveDot
+@onready var _blood_label: Label = $CanvasLayer/TopBar/BloodLabel
 @onready var _tooltip: ColorRect = $CanvasLayer/TooltipBar
 @onready var _tip_name: Label = $CanvasLayer/TooltipBar/NodeName
 @onready var _tip_desc: Label = $CanvasLayer/TooltipBar/NodeDesc
@@ -64,6 +65,7 @@ func _ready() -> void:
 	var synergy_engine = SynergyEngine.new()
 	add_child(synergy_engine)
 	_build_hint_dots()
+	update_blood_ui(ResourceManager.blood)
 
 func show_tooltip(info: Dictionary, node_color: Color) -> void:
 	_tip_name.text = info.name
@@ -496,6 +498,11 @@ func _slide_right_open() -> void:
 	_right_tween.tween_property(
 		$CanvasLayer/RightPanel, "modulate", Color(1, 1, 1, 1), 0.25
 	).set_ease(Tween.EASE_OUT)
+
+func update_blood_ui(amount: float) -> void:
+	# TopBar에 혈액 재화 표시
+	_blood_label.text = "🩸 " + str(int(amount))
+
 
 func _slide_right_close() -> void:
 	if _right_tween:
