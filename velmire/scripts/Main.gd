@@ -11,6 +11,10 @@ extends Node2D
 @onready var _tip_syn2: Label = $CanvasLayer/TooltipBar/Synergy2
 @onready var _stat_atk: Label = $CanvasLayer/TooltipBar/StatATK
 @onready var _stat_cd: Label = $CanvasLayer/TooltipBar/StatCooldown
+@onready var _hint_popup: PanelContainer = $CanvasLayer/HintPopup
+@onready var _hint_label: Label = $CanvasLayer/HintPopup/HintLabel
+@onready var _hint_area: Control = $CanvasLayer/HintArea
+@onready var _dots_container: Control = $CanvasLayer/HintArea/DotsContainer
 var _left_tween: Tween
 var _right_tween: Tween
 var _hp_tween: Tween
@@ -30,6 +34,17 @@ var _is_game_over: bool = false
 var _shake_intensity: float = 0.0
 var _shake_duration: float = 0.0
 var _vignette_tween: Tween
+var _hints: Array = [
+	"💡 Shift + 클릭으로 노드를 연결할 수 있어요",
+	"💡 흡혈 + 결계 연결 시 감속된 혈체에 데미지 2배",
+	"💡 흡혈 + 증폭 연결 시 공격 쿨다운 50% 감소",
+	"💡 결계 + 증폭 연결 시 감속 범위와 지속시간 2배",
+	"💡 Shift를 누르면 노드의 공격 범위를 확인할 수 있어요",
+	"💡 노드는 스킬 트리로 강화시킬 수 있어요",
+	"💡 관을 지키세요! HP가 0이 되면 게임오버",
+]
+var _selected_hint: int = -1
+var _hint_hiding: bool = false
 
 func _ready() -> void:
 	add_to_group("main")
@@ -44,9 +59,11 @@ func _ready() -> void:
 	$CanvasLayer/LeftTab.gui_input.connect(_on_left_tab_gui_input)
 	$CanvasLayer/RightTab.gui_input.connect(_on_right_tab_gui_input)
 	$CanvasLayer/CoffinHPBar.modulate = Color(1, 1, 1, 0)
+	_hint_popup.visible = false
 	_spawn_test_nodes()
 	var synergy_engine = SynergyEngine.new()
 	add_child(synergy_engine)
+	_build_hint_dots()
 
 func show_tooltip(info: Dictionary, node_color: Color) -> void:
 	_tip_name.text = info.name
@@ -61,6 +78,51 @@ func show_tooltip(info: Dictionary, node_color: Color) -> void:
 
 func hide_tooltip() -> void:
 	_tooltip.visible = false
+
+func _build_hint_dots() -> void:
+	var dot_size: int = 40
+	var spacing: int = 56
+	var total_width: int = _hints.size() * spacing
+	var start_x: int = (1920 - total_width) / 2
+
+	for i in range(_hints.size()):
+		var dot: Button = Button.new()
+		dot.custom_minimum_size = Vector2(dot_size, dot_size)
+		dot.size = Vector2(dot_size, dot_size)
+		dot.position = Vector2(start_x + i * spacing, 30)
+
+		var style: StyleBoxFlat = StyleBoxFlat.new()
+		style.bg_color = Color(0.4, 0.05, 0.05, 0.85)
+		style.set_corner_radius_all(20)
+		dot.add_theme_stylebox_override("normal", style)
+		dot.add_theme_stylebox_override("hover",
+			_make_dot_style(Color(0.8, 0.15, 0.15, 0.95)))
+		dot.add_theme_stylebox_override("pressed",
+			_make_dot_style(Color(1.0, 0.3, 0.3, 1.0)))
+		var idx: int = i
+		dot.pressed.connect(func(): _on_dot_pressed(idx))
+		dot.modulate = Color(1, 1, 1, 0)
+		_dots_container.add_child(dot)
+
+func _make_dot_style(color: Color) -> StyleBoxFlat:
+	var s: StyleBoxFlat = StyleBoxFlat.new()
+	s.bg_color = color
+	s.set_corner_radius_all(20)
+	return s
+
+func _on_dot_pressed(index: int) -> void:
+	_hint_label.text = _hints[index]
+	_hint_popup.visible = true
+	_hint_popup.modulate = Color(1, 1, 1, 0)
+	_hint_popup.position = Vector2(_hint_popup.position.x, 930.0)
+	var tween: Tween = create_tween()
+	tween.tween_property(_hint_popup, "position:y", 900.0, 0.3
+	).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUART)
+	tween.parallel().tween_property(_hint_popup, "modulate", Color(1, 1, 1, 1), 0.3)
+	tween.tween_interval(4.0)
+	tween.tween_property(_hint_popup, "modulate", Color(1, 1, 1, 0), 0.4
+	).set_ease(Tween.EASE_IN)
+	tween.tween_callback(func(): _hint_popup.visible = false)
 
 func _get_hovered_game_node():
 	for n in get_tree().get_nodes_in_group("game_nodes"):
@@ -96,6 +158,44 @@ func _process(delta: float) -> void:
 		if _hp_hide_timer <= 0.0:
 			_hp_visible = false
 			_fade_hp_bar(false)
+
+	var my: float = get_viewport().get_mouse_position().y
+	if my > 880:
+		_hint_hiding = false
+		if not _hint_area.visible:
+			_hint_area.visible = true
+			_hint_area.modulate = Color(1, 1, 1, 1)
+			_hint_area.position = Vector2(_hint_area.position.x, 980.0)
+
+			var dots: Array = _dots_container.get_children()
+			for i in range(dots.size()):
+				var dot: Control = dots[i]
+				dot.position = Vector2(dot.position.x, 70.0)
+				dot.modulate = Color(1, 1, 1, 0)
+
+				var tween: Tween = dot.create_tween()
+				tween.tween_interval(i * 0.07)
+				tween.tween_property(dot, "position:y", 30.0, 0.35
+				).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+				tween.parallel().tween_property(dot, "modulate", Color(1, 1, 1, 1), 0.25)
+	else:
+		if _hint_area.visible and not _hint_hiding:
+			_hint_hiding = true
+			var dots: Array = _dots_container.get_children()
+			for i in range(dots.size()):
+				var dot: Control = dots[i]
+				var tween: Tween = dot.create_tween()
+				tween.tween_interval(i * 0.05)
+				tween.tween_property(dot, "position:y", 70.0, 0.25
+				).set_ease(Tween.EASE_IN)
+				tween.parallel().tween_property(dot, "modulate", Color(1, 1, 1, 0), 0.2)
+
+			var hide_delay: float = dots.size() * 0.05 + 0.25
+			get_tree().create_timer(hide_delay).timeout.connect(func():
+				if _hint_hiding:
+					_hint_area.visible = false
+					_hint_hiding = false
+			)
 
 	var hovered_node = _get_hovered_game_node()
 	if hovered_node:

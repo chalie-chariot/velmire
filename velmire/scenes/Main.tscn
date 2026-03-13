@@ -1,4 +1,4 @@
-[gd_scene load_steps=25 format=3 uid="uid://b1main001"]
+[gd_scene load_steps=26 format=3 uid="uid://b1main001"]
 
 [ext_resource type="Script" path="res://scripts/Main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/HeartPulse.tscn" id="2_heartpulse"]
@@ -64,6 +64,21 @@ corner_radius_left = 4
 corner_radius_right = 4
 corner_radius_top = 4
 corner_radius_bottom = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hint_popup"]
+bg_color = Color(0.101961, 0.101961, 0.101961, 0.85)
+corner_radius_left = 30
+corner_radius_right = 30
+corner_radius_top = 30
+corner_radius_bottom = 30
+border_width_left = 0
+border_width_top = 0
+border_width_right = 0
+border_width_bottom = 0
+content_margin_left = 30
+content_margin_top = 12
+content_margin_right = 30
+content_margin_bottom = 12
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_node_slot"]
 bg_color = Color(0.101961, 0, 0, 1)
@@ -895,6 +910,42 @@ offset_bottom = 710.0
 [node name="ChatLog" type="VBoxContainer" parent="CanvasLayer/RightPanel/ChatBox/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
+
+[node name="HintArea" type="Control" parent="CanvasLayer"]
+layout_mode = 0
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 980.0
+offset_right = 1920.0
+offset_bottom = 1080.0
+visible = false
+
+[node name="DotsContainer" type="Control" parent="CanvasLayer/HintArea"]
+layout_mode = 0
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 1920.0
+offset_bottom = 100.0
+
+[node name="HintPopup" type="PanelContainer" parent="CanvasLayer"]
+layout_mode = 0
+anchors_preset = 0
+offset_left = 670.0
+offset_top = 900.0
+offset_right = 1250.0
+offset_bottom = 955.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_hint_popup")
+
+[node name="HintLabel" type="Label" parent="CanvasLayer/HintPopup"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 20
+text = ""
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="VignetteOverlay" type="ColorRect" parent="CanvasLayer"]
 layout_mode = 3
