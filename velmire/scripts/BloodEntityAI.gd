@@ -42,8 +42,8 @@ func _draw() -> void:
 	if _points.size() == 0:
 		return
 	var smooth: PackedVector2Array = _get_smooth_points()
-	draw_colored_polygon(smooth, Color(0.55, 0.0, 0.0, 1.0))
+	draw_colored_polygon(smooth, Color(0.35, 0.0, 0.0, 1.0))
 	for i in range(smooth.size()):
 		var a: Vector2 = smooth[i]
 		var b: Vector2 = smooth[(i + 1) % smooth.size()]
-		draw_line(a, b, Color(1.0, 0.2, 0.2, 1.0), 1.5)
+		draw_line(a, b, Color(0.6, 0.05, 0.05, 1.0), 1.5)

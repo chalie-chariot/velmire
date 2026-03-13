@@ -36,6 +36,7 @@ func _ready() -> void:
 	$CanvasLayer/LeftTab.gui_input.connect(_on_left_tab_gui_input)
 	$CanvasLayer/RightTab.gui_input.connect(_on_right_tab_gui_input)
 	$CanvasLayer/CoffinHPBar.modulate = Color(1, 1, 1, 0)
+	_spawn_test_nodes()
 
 func _process(delta: float) -> void:
 	if _is_game_over:
@@ -67,6 +68,22 @@ func _process(delta: float) -> void:
 			_fade_hp_bar(false)
 
 	_apply_shake(delta)
+
+func _spawn_test_nodes() -> void:
+	var node_scene = preload("res://scenes/GameNode.tscn")
+	var types = [
+		{"id": "absorb", "type": "흡혈", "color": Color(0.9, 0.1, 0.1)},
+		{"id": "freeze", "type": "결계", "color": Color(0.1, 0.3, 0.9)},
+		{"id": "resonate", "type": "증폭", "color": Color(0.1, 0.8, 0.2)},
+	]
+	for i in range(3):
+		var node = node_scene.instantiate()
+		node.node_id = types[i]["id"]
+		node.node_type = types[i]["type"]
+		node.node_color = types[i]["color"]
+		node._slot_position = Vector2(100, 300 + i * 120)
+		node.global_position = node._slot_position
+		$EntityLayer.add_child(node)
 
 func _spawn_blood_entity() -> void:
 	var entity = blood_entity_scene.instantiate()

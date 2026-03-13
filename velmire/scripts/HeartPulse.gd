@@ -16,6 +16,7 @@ var _pulsing: bool = false
 var _max_pulse_radius: float = 1200.0
 
 func _ready() -> void:
+	add_to_group("heart_pulse")
 	for r in range(GRID_ROWS):
 		var row: Array = []
 		for c in range(GRID_COLS):
