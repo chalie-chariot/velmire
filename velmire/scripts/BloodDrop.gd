@@ -4,17 +4,20 @@ var value: float = 1.0
 var _target: Vector2 = Vector2.ZERO
 var _speed: float = 0.0
 var _time: float = 0.0
-var _size: float = 6.0
+var _size: float = 10.0
 var _alpha: float = 1.0
 var _phase: String = "burst"
 var _burst_vel: Vector2 = Vector2.ZERO
 var _curve_angle: float = 0.0  # 곡선 방향
+var _trail: Array = []  # 잔상 위치 기록
+var _is_stage4: bool = false  # 4단계 이상 여부
+var _trail_max: int = 32
 
-func setup(pos: Vector2, drop_value: float, coffin_center: Vector2) -> void:
+func setup(pos: Vector2, drop_value: float, coffin_center: Vector2, stage4: bool = false) -> void:
 	global_position = pos
 	value = drop_value
 	_target = coffin_center
-	_size = clamp(drop_value * 2.5, 4.0, 20.0)
+	_size = clamp(drop_value * 4.2, 7.0, 38.0)
 	# 강하게 튕겨나감 - 관 반대 방향 기준으로 퍼짐
 	var away_dir: Vector2 = (pos - coffin_center).normalized()
 	var spread: float = randf_range(-0.6, 0.6)  # ±약 35도 퍼짐
@@ -22,6 +25,7 @@ func setup(pos: Vector2, drop_value: float, coffin_center: Vector2) -> void:
 	_burst_vel = burst_dir * randf_range(500.0, 900.0)
 	# 곡선 휘어질 방향 (시계/반시계 랜덤)
 	_curve_angle = 1.0 if randf() > 0.5 else -1.0
+	_is_stage4 = stage4
 
 func _process(delta: float) -> void:
 	_time += delta
@@ -35,11 +39,15 @@ func _process(delta: float) -> void:
 				_speed = 0.0
 
 		"suck":
+			if _is_stage4:
+				_trail.append(global_position)
+				if _trail.size() > _trail_max:
+					_trail.pop_front()
 			var dist: float = global_position.distance_to(_target)
 			var dir: Vector2 = (_target - global_position).normalized()
 			_speed += 3000.0 * delta
 			global_position += dir * _speed * delta
-			_size = clamp(dist / 60.0, 0.5, _size)
+			_size = clamp(dist / 45.0, 1.0, _size)
 
 			if dist < 8.0:
 				ResourceManager.add_blood(value)
@@ -48,8 +56,17 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	var pulse: float = sin(_time * 3.0) * 0.8
-	var r: float = (_size + pulse) * 0.7  # 0.7배 크기
+	if _is_stage4 and _trail.size() > 1:
+		for i in range(_trail.size() - 1):
+			var t: float = float(i) / _trail.size()
+			var trail_pos: Vector2 = _trail[i] - global_position
+			var trail_pos2: Vector2 = _trail[i + 1] - global_position
+			var trail_alpha: float = t * 0.75
+			var trail_width: float = _size * t * 2.4
+			draw_line(trail_pos, trail_pos2,
+				Color(0.9, 0.05, 0.05, trail_alpha), max(trail_width, 1.2))
+	var pulse: float = sin(_time * 3.0) * 1.4
+	var r: float = (_size + pulse) * 0.9
 	draw_circle(Vector2.ZERO, r,
 		Color(0.8, 0.0, 0.0, _alpha))
 	draw_circle(Vector2.ZERO, r * 0.5,

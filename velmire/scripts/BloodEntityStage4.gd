@@ -60,12 +60,13 @@ func _get_smooth_silhouette() -> PackedVector2Array:
 
 func _generate_tendrils() -> void:
 	_tendrils.clear()
+	var max_r: float = radius * 0.82
 	for i in range(_tendril_count):
 		var base_angle: float = (TAU / _tendril_count) * i + randf_range(-0.2, 0.2)
 		var ctrl_points: Array = []
 		for j in range(5):
 			var t: float = float(j) / 4.0
-			var r: float = radius * 0.12 + radius * 0.88 * t
+			var r: float = radius * 0.12 + (max_r - radius * 0.12) * t
 			var angle: float = base_angle + randf_range(-0.4, 0.4) * (1.0 - t * 0.5)
 			ctrl_points.append(Vector2(cos(angle), sin(angle)) * r)
 		_tendrils.append({
@@ -131,11 +132,11 @@ func _draw() -> void:
 		var glow_pts: PackedVector2Array = []
 		for p in smooth:
 			glow_pts.append(p * 1.12)
-		draw_colored_polygon(glow_pts, Color(0.4, 0.02, 0.02, 0.55))
-		draw_colored_polygon(smooth, Color(0.45, 0.02, 0.02, 0.95))
+		draw_colored_polygon(glow_pts, Color(0.04, 0.04, 0.04, 0.55))
+		draw_colored_polygon(smooth, Color(0.05, 0.05, 0.05, 0.95))
 	else:
-		draw_circle(Vector2.ZERO, radius * 1.15, Color(0.4, 0.02, 0.02, 0.55))
-		draw_circle(Vector2.ZERO, radius * 0.95, Color(0.45, 0.02, 0.02, 0.95))
+		draw_circle(Vector2.ZERO, radius * 1.15, Color(0.04, 0.04, 0.04, 0.55))
+		draw_circle(Vector2.ZERO, radius * 0.95, Color(0.05, 0.05, 0.05, 0.95))
 
 	for tendril in _tendrils:
 		var phase: float = tendril.phase
@@ -187,7 +188,8 @@ func _draw() -> void:
 					var w: float = w_base * (2.0 - 1.7 * t) * 0.7
 					w = max(w, 1.0)
 					var glow_col: Color = Color(1.0, 0.35, 0.35, clampf(pulse_glow * 1.1, 0.0, 1.0)).lerp(Color(0.35, 0.02, 0.02, pulse_glow * 0.6), 1.0 - t)
-					draw_line(pts[i], pts[i+1], Color(glow_col.r, glow_col.g, glow_col.b, glow_col.a * 0.5), w + 4.0)
+					draw_line(pts[i], pts[i+1], Color(0.9, 0.15, 0.15, pulse_glow * 0.25), w + 10.0)
+					draw_line(pts[i], pts[i+1], Color(1.0, 0.2, 0.2, glow_col.a * 0.45), w + 4.0)
 					draw_line(pts[i], pts[i+1], glow_col, w)
 
 	if _nucleus_pts.size() >= 3:
@@ -201,16 +203,28 @@ func _draw() -> void:
 			outer.append(p * 1.05 * s)
 			mid.append(p * 0.65 * s)
 			inner.append(p * 0.35 * s)
+		var glow_far: PackedVector2Array = []
+		var glow_near: PackedVector2Array = []
+		for p in outer:
+			glow_far.append(p * 1.5)
+			glow_near.append(p * 1.25)
+		draw_colored_polygon(glow_far, Color(0.5, 0.0, 0.0, 0.22))
+		draw_colored_polygon(glow_near, Color(0.55, 0.0, 0.0, 0.35))
 		draw_colored_polygon(outer, Color(0.15, 0.0, 0.0, 1.0))
 		draw_colored_polygon(mid, Color(0.55, 0.02, 0.02, 1.0))
 		draw_colored_polygon(inner, Color(0.82, 0.08, 0.08, 0.95))
 		var core_idx: int = _nucleus_pts.size() / 2
 		var core_offset: Vector2 = _nucleus_pts[0].lerp(_nucleus_pts[core_idx], 0.3) * 0.15
+		draw_circle(core_offset, radius * 0.12, Color(0.7, 0.0, 0.0, 0.4))
+		draw_circle(core_offset, radius * 0.08, Color(0.9, 0.1, 0.1, 0.55))
 		draw_circle(core_offset, radius * 0.06, Color(0.95, 0.25, 0.25, 0.85))
 	else:
+		draw_circle(Vector2.ZERO, radius * 0.5, Color(0.5, 0.0, 0.0, 0.25))
+		draw_circle(Vector2.ZERO, radius * 0.4, Color(0.55, 0.0, 0.0, 0.38))
 		draw_circle(Vector2.ZERO, radius * 0.32, Color(0.15, 0.0, 0.0, 1.0))
 		draw_circle(Vector2.ZERO, radius * 0.22, Color(0.55, 0.02, 0.02, 1.0))
 		draw_circle(Vector2.ZERO, radius * 0.13, Color(0.82, 0.08, 0.08, 0.95))
+		draw_circle(Vector2(-radius * 0.08, -radius * 0.1), radius * 0.1, Color(0.7, 0.0, 0.0, 0.45))
 		draw_circle(Vector2(-radius * 0.08, -radius * 0.1), radius * 0.06, Color(0.95, 0.25, 0.25, 0.85))
 
 	if _hp_bar_alpha > 0:
@@ -295,4 +309,4 @@ func _drop_blood() -> void:
 		var drop = drop_scene.instantiate()
 		get_parent().add_child(drop)
 		var drop_value: float = max(1.0, max_hp / 60.0)
-		drop.setup(global_position, drop_value, target_pos)
+		drop.setup(global_position, drop_value, target_pos, true)
