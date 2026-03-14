@@ -10,6 +10,7 @@ const CONNECT_RANGE := 400.0  # 시너지 연결 가능 거리
 var radius: float = 28.0
 var is_dragging: bool = false
 var is_placed: bool = false
+var is_starter_node: bool = false  # 초기 무료 노드 2개 (취소 환불 제외)
 var grid_col: int = -1
 var grid_row: int = -1
 var _drag_offset: Vector2 = Vector2.ZERO
@@ -139,12 +140,8 @@ func _input(event: InputEvent) -> void:
 				is_selected = false
 
 		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed and is_hover and _is_topmost_hovered():
-			# 우클릭 → 시너지 연결 해제
-			if is_placed:
-				var cm = get_tree().get_first_node_in_group("connection_manager")
-				if cm:
-					cm.disconnect_from(self)
-				get_viewport().set_input_as_handled()
+			on_right_click()
+			get_viewport().set_input_as_handled()
 
 		elif event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
 			if is_dragging:
@@ -296,6 +293,64 @@ func _get_ability_range() -> float:
 		"증폭":
 			return 120.0
 	return 200.0
+
+func on_right_click() -> void:
+	if not is_placed:
+		return
+
+	# 연결 상태 확인
+	var cm = get_tree().get_first_node_in_group("connection_manager")
+	var is_connected: bool = false
+	if cm:
+		var conns = cm.get_connections_for(self)
+		is_connected = conns.size() > 0
+
+	# 연결 해제
+	if cm:
+		cm.disconnect_from(self)
+
+	# 그리드 셀 비움
+	var grid = get_tree().get_first_node_in_group("heart_pulse")
+	if grid and grid_col >= 0 and grid_row >= 0:
+		grid.remove_node(grid_col, grid_row)
+
+	# 재화 환불 (초기 무료 노드 2개 제외)
+	if not is_starter_node:
+		var base_cost: float = 0.0
+		match node_type:
+			"흡혈": base_cost = 10.0
+			"결계": base_cost = 15.0
+			"증폭": base_cost = 20.0
+
+		var refund: float = base_cost * (0.3 if is_connected else 0.5)
+
+		if ResourceManager:
+			ResourceManager.add_blood(refund)
+
+		# 환불 숫자 팝업
+		var label: Label = Label.new()
+		label.text = "+%d 🩸" % int(refund)
+		label.add_theme_font_size_override("font_size", 16)
+		label.add_theme_color_override("font_color",
+			Color(0.5, 0.8, 1.0, 1.0) if is_connected else Color(1.0, 0.8, 0.3, 1.0))
+		label.global_position = global_position + Vector2(-20, -40)
+		get_parent().add_child(label)
+		var tween: Tween = label.create_tween()
+		tween.tween_property(label, "global_position",
+			label.global_position + Vector2(0, -40), 0.8)
+		tween.parallel().tween_property(label, "modulate:a", 0.0, 0.8)
+		tween.tween_callback(label.queue_free)
+
+	# 물방울 터짐 이펙트
+	_spawn_burst_effect()
+	queue_free()
+
+func _spawn_burst_effect() -> void:
+	var effect = Node2D.new()
+	effect.set_script(preload("res://scripts/NodeBurstEffect.gd"))
+	effect.global_position = global_position
+	get_parent().add_child(effect)
+	effect.setup(node_color)
 
 func _get_node_info() -> Dictionary:
 	match node_type:

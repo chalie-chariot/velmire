@@ -4,7 +4,7 @@ signal resource_changed(type: String, new_value: Variant)
 signal blood_changed(new_value: int)
 signal special_changed(new_value: float)
 
-var blood: int = 0
+var blood: int = 50  # 테스트용 초기값
 var special: float = 0.0
 var node_fragments: int = 0
 var difficulty: int = 0  # 0단계부터 시작
@@ -23,6 +23,12 @@ func apply_synergy_effect(synergy: Dictionary, effect_data: Dictionary, position
 func add_blood(amount) -> void:
 	blood += int(amount)
 	blood_changed.emit(blood)
+
+
+func heal_coffin(amount: float) -> void:
+	var main = get_tree().get_first_node_in_group("main")
+	if main and main.has_method("heal_coffin"):
+		main.heal_coffin(amount)
 
 
 func add_special(amount: float) -> void:

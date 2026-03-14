@@ -118,6 +118,7 @@ func _spawn_start_nodes() -> void:
 		node.node_id = data.id
 		node.node_type = data.type
 		node.node_color = data.color
+		node.is_starter_node = true
 		# 관 좌우에 배치 (화면 정중앙과 동일한 수직선)
 		var coffin_center: Vector2 = _coffin_rect.position + _coffin_rect.size / 2
 		var offset_x: float = -120.0 if i == 0 else 120.0
@@ -391,28 +392,32 @@ func _check_coffin_collision() -> void:
 			if coffin_hp <= 0.0:
 				_game_over()
 
-func _show_hp_bar() -> void:
+func _show_hp_bar(from_damage: bool = true) -> void:
 	var hp_fill = $CanvasLayer/CoffinHPBar/HPFill
 	var damage_bar = $CanvasLayer/CoffinHPBar/DamageBar
 	var label = $CanvasLayer/CoffinHPBar/HPBarLabel
 
-	damage_bar.modulate = Color(1, 1, 1, 1)
-
 	var ratio: float = coffin_hp / coffin_max_hp
-	var damage_ratio: float = (coffin_hp + 10.0) / coffin_max_hp
 
 	hp_fill.offset_right = 1200.0 * ratio
-
-	damage_bar.offset_right = 1200.0 * damage_ratio
-	if _damage_tween:
-		_damage_tween.kill()
-	_damage_tween = create_tween()
-	_damage_tween.tween_interval(0.25)
-	_damage_tween.tween_property(
-		damage_bar, "offset_right", 1200.0 * ratio, 0.85
-	).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUART)
-
 	label.text = "HP %d / %d" % [int(coffin_hp), int(coffin_max_hp)]
+
+	if from_damage:
+		damage_bar.modulate = Color(1, 1, 1, 1)
+		var damage_ratio: float = (coffin_hp + 10.0) / coffin_max_hp
+		damage_bar.offset_right = 1200.0 * damage_ratio
+		if _damage_tween:
+			_damage_tween.kill()
+		_damage_tween = create_tween()
+		_damage_tween.tween_interval(0.25)
+		_damage_tween.tween_property(
+			damage_bar, "offset_right", 1200.0 * ratio, 0.85
+		).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUART)
+	else:
+		if _damage_tween:
+			_damage_tween.kill()
+		damage_bar.offset_right = 1200.0 * ratio
+		damage_bar.modulate = Color(1, 1, 1, 0)
 
 	_fade_hp_bar(true)
 	_hp_visible = true
@@ -429,6 +434,35 @@ func _apply_shake(delta: float) -> void:
 	else:
 		_shake_offset = Vector2.ZERO
 		$EntityLayer.position = Vector2.ZERO
+
+func heal_coffin(amount: float) -> void:
+	if coffin_hp >= coffin_max_hp:
+		return
+	var actual: float = min(amount, coffin_max_hp - coffin_hp)
+	var old_ratio: float = coffin_hp / coffin_max_hp
+	coffin_hp += actual
+	var new_ratio: float = coffin_hp / coffin_max_hp
+
+	_show_hp_bar(false)
+
+	var heal_bar: ColorRect = $CanvasLayer/CoffinHPBar/HealBar
+	heal_bar.offset_left = 1200.0 * old_ratio
+	heal_bar.offset_right = 1200.0 * old_ratio
+	heal_bar.modulate = Color(1, 1, 1, 1)
+
+	var heal_tween: Tween = create_tween()
+	heal_tween.tween_property(
+		heal_bar, "offset_right", 1200.0 * new_ratio, 0.35
+	).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUART)
+	heal_tween.tween_property(heal_bar, "modulate", Color(1, 1, 1, 0), 0.25).set_ease(Tween.EASE_IN)
+	heal_tween.tween_callback(func():
+		heal_bar.offset_left = 0.0
+		heal_bar.offset_right = 0.0
+	)
+
+	var tween: Tween = create_tween()
+	tween.tween_property(_coffin_rect, "scale", Vector2(1.15, 1.15), 0.1).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_coffin_rect, "scale", Vector2(1.0, 1.0), 0.2).set_ease(Tween.EASE_IN)
 
 func _trigger_shake() -> void:
 	var hp_ratio: float = coffin_hp / coffin_max_hp

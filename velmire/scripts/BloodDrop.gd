@@ -51,6 +51,7 @@ func _process(delta: float) -> void:
 
 			if dist < 8.0:
 				ResourceManager.add_blood(value)
+				ResourceManager.heal_coffin(value * 2.0)
 				queue_free()
 
 	queue_redraw()
