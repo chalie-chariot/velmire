@@ -1,10 +1,13 @@
 extends Node
 
 signal resource_changed(type: String, new_value: Variant)
+signal blood_changed(new_value: int)
+signal special_changed(new_value: float)
 
-var blood: float = 0.0
+var blood: int = 0
 var special: float = 0.0
 var node_fragments: int = 0
+var difficulty: int = 0
 
 
 func _ready() -> void:
@@ -17,33 +20,38 @@ func apply_synergy_effect(synergy: Dictionary, effect_data: Dictionary, position
 	pass
 
 
-func add_blood(amount: float) -> void:
-	blood += amount
-	resource_changed.emit("blood", blood)
-	# TopBar 재화 표시 업데이트
-	var main = get_tree().get_first_node_in_group("main")
-	if main:
-		main.update_blood_ui(blood)
+func add_blood(amount) -> void:
+	blood += int(amount)
+	blood_changed.emit(blood)
+
+
+func add_special(amount: float) -> void:
+	special += amount
+	special_changed.emit(special)
 
 
 func add_resource(type: String, amount: float) -> void:
 	match type:
 		"blood":
-			blood += amount
+			blood += int(amount)
 			resource_changed.emit("blood", blood)
+			blood_changed.emit(blood)
 		"special":
 			special += amount
 			resource_changed.emit("special", special)
+			special_changed.emit(special)
 		"node":
 			node_fragments += int(amount)
 			resource_changed.emit("node", node_fragments)
 
 
 func spend_blood(amount: float) -> bool:
-	if blood < amount:
+	var amt: int = int(amount)
+	if blood < amt:
 		return false
-	blood -= amount
+	blood -= amt
 	resource_changed.emit("blood", blood)
+	blood_changed.emit(blood)
 	return true
 
 
@@ -52,6 +60,7 @@ func spend_special(amount: float) -> bool:
 		return false
 	special -= amount
 	resource_changed.emit("special", special)
+	special_changed.emit(special)
 	return true
 
 

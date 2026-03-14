@@ -5,6 +5,8 @@ var node_type: String = ""  # "흡혈" / "결계" / "증폭"
 var node_color: Color = Color(1.0, 0.0, 0.0)
 var _time: float = 0.0
 var _base_points: PackedVector2Array = []
+const CONNECT_RANGE := 400.0  # 시너지 연결 가능 거리
+
 var radius: float = 28.0
 var is_dragging: bool = false
 var is_placed: bool = false
@@ -17,14 +19,20 @@ var _attack_timer: float = 0.0
 var synergy_double_damage: bool = false
 var synergy_fast_cooldown: bool = false
 var synergy_wide_slow: bool = false
-var is_pending_connection: bool = false
 var _phase_offset: float = 0.0
 var is_hovered: bool = false
+var is_highlighted: bool = false
+var is_pending_connection: bool = false
+var _shift_held: bool = false
+var _is_first_selected: bool = false
+var is_selected: bool = false
 
 func _ready() -> void:
 	_generate_base_points()
 	_phase_offset = randf_range(0.0, TAU)
 	add_to_group("game_nodes")
+	if node_type == "흡혈":
+		attack_cooldown = 2.0
 
 func _generate_base_points() -> void:
 	_base_points.clear()
@@ -34,38 +42,69 @@ func _generate_base_points() -> void:
 		var r: float = radius
 		_base_points.append(Vector2(cos(angle) * r, sin(angle) * r))
 
+func _deselect_all_others() -> void:
+	var nodes = get_tree().get_nodes_in_group("game_nodes")
+	for n in nodes:
+		if n != self:
+			n.is_selected = false
+
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_LEFT:
-			var local_pos = to_local(get_global_mouse_position())
-			var is_hover: bool = local_pos.length() <= radius + 10.0
+		var local_pos = to_local(get_global_mouse_position())
+		var is_hover: bool = local_pos.length() <= radius + 10.0
 
-			if event.pressed and is_hover:
+		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			if is_hover:
 				if Input.is_key_pressed(KEY_SHIFT) and is_placed:
+					# SHIFT + 좌클릭
 					var cm = get_tree().get_first_node_in_group("connection_manager")
 					if cm:
-						cm.try_connect(self)
+						if cm.get_pending() == null:
+							cm.start_connect(self)
+						else:
+							cm.finish_connect(self)
 					get_viewport().set_input_as_handled()
-				else:
-					if is_placed:
-						var cm = get_tree().get_first_node_in_group("connection_manager")
-						if cm:
-							cm.disconnect_node(self)
-						var grid = get_tree().get_first_node_in_group("heart_pulse")
-						if grid and grid_col >= 0 and grid_row >= 0:
-							grid.remove_node(grid_col, grid_row)
-						grid_col = -1
-						grid_row = -1
-					is_placed = false
-					is_dragging = true
-					_drag_offset = global_position - get_global_mouse_position()
-					_slot_position = global_position
+				elif not Input.is_key_pressed(KEY_SHIFT):
+					if is_selected:
+						# 이미 선택된 노드 재클릭 → 선택 해제 (노드 밖 클릭과 동일)
+						is_selected = false
+					else:
+						# 선택 + 드래그
+						_deselect_all_others()
+						is_selected = true
+						var prev_col := grid_col
+						var prev_row := grid_row
+						if is_placed:
+							var grid = get_tree().get_first_node_in_group("heart_pulse")
+							if grid and prev_col >= 0 and prev_row >= 0:
+								grid.remove_node(prev_col, prev_row)
+							is_placed = false
+							grid_col = -1
+							grid_row = -1
+						is_dragging = true
+						_drag_offset = global_position - get_global_mouse_position()
+						_slot_position = global_position
 					get_viewport().set_input_as_handled()
+			else:
+				# 다른 곳 클릭 시 선택 해제
+				is_selected = false
 
-			elif not event.pressed and is_dragging:
-				is_dragging = false
-				_try_place_on_grid()
+		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed and is_hover:
+			# 우클릭 → 시너지 연결 해제
+			if is_placed:
+				var cm = get_tree().get_first_node_in_group("connection_manager")
+				if cm:
+					cm.disconnect_from(self)
 				get_viewport().set_input_as_handled()
+
+		elif event.button_index == MOUSE_BUTTON_LEFT and not event.pressed and is_dragging:
+			is_dragging = false
+			_try_place_on_grid()
+			get_viewport().set_input_as_handled()
+
+	if event is InputEventKey:
+		if event.keycode == KEY_SHIFT:
+			_shift_held = event.pressed
 
 func _process(delta: float) -> void:
 	_time += delta
@@ -143,22 +182,21 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, radius * 1.35, 0, TAU, 64,
 			Color(node_color.r, node_color.g, node_color.b, 0.7), 2.5)
 
-	if is_pending_connection:
-		var pulse: float = abs(sin(_time * 4.0))
-		draw_arc(Vector2.ZERO, radius * 1.5, 0, TAU, 64,
-			Color(1.0, 1.0, 1.0, pulse), 2.5)
-		draw_arc(Vector2.ZERO, radius * 1.3, 0, TAU, 64,
-			Color(node_color.r, node_color.g, node_color.b, pulse * 0.6), 1.5)
-
 	if is_hovered:
 		draw_arc(Vector2.ZERO, radius * 1.5, 0, TAU, 64,
 			Color(node_color.r, node_color.g, node_color.b, 0.5), 2.0)
 
-	if Input.is_key_pressed(KEY_SHIFT) and is_placed:
+	# 클릭 선택 시 범위 표시
+	if is_selected and is_placed:
+		draw_arc(Vector2.ZERO, 200.0, 0, TAU, 128,
+			Color(node_color.r, node_color.g, node_color.b, 0.8), 1.5)
+
+	# SHIFT 연결 첫 번째 선택 시 범위 표시 (그라데이션 원)
+	if _is_first_selected and is_placed:
 		var rings: int = 40
 		for i in range(rings, 0, -1):
 			var t: float = float(i) / rings
-			var r: float = 200.0 * t
+			var r: float = CONNECT_RANGE * t
 			var alpha: float = t * t * 0.025
 			var fill_pts: PackedVector2Array = []
 			for j in range(64):
@@ -166,9 +204,25 @@ func _draw() -> void:
 				fill_pts.append(Vector2(cos(a), sin(a)) * r)
 			draw_colored_polygon(fill_pts,
 				Color(node_color.r, node_color.g, node_color.b, alpha))
-
-		draw_arc(Vector2.ZERO, 200.0, 0, TAU, 128,
+		draw_arc(Vector2.ZERO, CONNECT_RANGE, 0, TAU, 128,
 			Color(node_color.r, node_color.g, node_color.b, 0.6), 1.0)
+
+	if is_highlighted:
+		var pulse: float = abs(sin(_time * 4.0))
+		draw_arc(Vector2.ZERO, radius * 1.6, 0, TAU, 64,
+			Color(1.0, 1.0, 0.5, pulse * 0.8), 2.5)
+		draw_arc(Vector2.ZERO, radius * 1.8, 0, TAU, 64,
+			Color(1.0, 1.0, 0.5, pulse * 0.3), 1.5)
+
+func _get_ability_range() -> float:
+	match node_type:
+		"흡혈":
+			return 200.0
+		"결계":
+			return 400.0 if synergy_wide_slow else 200.0
+		"증폭":
+			return 120.0
+	return 200.0
 
 func _get_node_info() -> Dictionary:
 	match node_type:
@@ -179,7 +233,7 @@ func _get_node_info() -> Dictionary:
 				synergy1 = "결계 연결: 데미지 2배",
 				synergy2 = "증폭 연결: 쿨다운 50%↓",
 				atk = 30,
-				cooldown = 3.0
+				cooldown = 2.0
 			}
 		"결계":
 			return {
@@ -214,6 +268,9 @@ func _try_place_on_grid() -> void:
 		is_placed = true
 		grid_col = cell.x
 		grid_row = cell.y
+		var cm = get_tree().get_first_node_in_group("connection_manager")
+		if cm and cm.has_method("set_last_placed"):
+			cm.set_last_placed(self)
 	else:
 		_return_to_slot()
 
@@ -225,7 +282,9 @@ func _return_to_slot() -> void:
 func _do_attack() -> void:
 	match node_type:
 		"흡혈":
-			_attack_nearest_entity(999.0)
+			var diff: int = ResourceManager.difficulty if ResourceManager else 0
+			var damage: float = 25.0 + diff * 10.0
+			_attack_nearest_entity(damage)
 		"결계":
 			_slow_nearest_entity()
 		"증폭":

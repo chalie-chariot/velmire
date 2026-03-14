@@ -1,0 +1,21 @@
+{
+  "scenes/Main.tscn": "Main (Node2D)\n  Background (ColorRect)\n  EntityLayer (Node2D)\n    HeartPulse (instance: HeartPulse.tscn)\n    ConnectionManager (Node2D)\n  CanvasLayer (CanvasLayer)\n    TopBar (Panel)\n      LiveDot (Label)\n      LiveText (Label)\n      TimerLabel (Label)\n      BloodLabel (Label)\n    Coffin (ColorRect)\n    CoffinHPBar (Control)\n      BG (ColorRect)\n      DamageBar (ColorRect)\n      HPFill (ColorRect)\n      HPBarLabel (Label)\n    LeftTab (ColorRect)\n      KeyBox (Panel)\n        Label (Label)\n      Icon1 (Label)\n      Icon2 (Label)\n      Icon3 (Label)\n      Icon4 (Label)\n    LeftPanel (Panel)\n      Card1_Resources (Panel)\n        ResourcesVBox (VBoxContainer)\n          BloodRow (HBoxContainer)\n            BloodLabel (Label)\n            BloodValue (Label)\n          SpecialRow (HBoxContainer)\n            SpecialLabel (Label)\n            SpecialValue (Label)\n      Card2_Automation (Panel)\n        AutoLabel (Label)\n        LvLabel (Label)\n        AutoProgressBar (ProgressBar)\n      Card3_NodeSlots (Panel)\n        NodeSlotLabel (Label)\n        NodeSlot1 (Panel)\n          Label (Label)\n        NodeSlot2 (Panel)\n          Label (Label)\n        NodeSlot3 (Panel)\n          Label (Label)\n        NodeSlot4 (Panel)\n          Label (Label)\n        NodeSlot5 (Panel)\n          Label (Label)\n        NodeSlot6 (Panel)\n          Label (Label)\n      Card4_DeckSlots (Panel)\n        DeckSlotLabel (Label)\n        DeckSlot1 (Panel)\n          ColorIndicator (ColorRect)\n          Label (Label)\n        DeckSlot2 (Panel)\n          ColorIndicator (ColorRect)\n          Label (Label)\n        DeckSlot3 (Panel)\n          ColorIndicator (ColorRect)\n          Label (Label)\n    RightTab (ColorRect)\n      KeyBox (Panel)\n        Label (Label)\n      Icon1 (Label)\n      Icon2 (Label)\n    RightPanel (Panel)\n      VelmireFacecam (ColorRect)\n        FacecamPlaceholder (Panel)\n        VelmireLabel (Label)\n      ChatBox (Panel)\n        ChatLabel (Label)\n        ScrollContainer (ScrollContainer)\n          ChatLog (VBoxContainer)\n    HintArea (Control)\n      DotsContainer (Control)\n    HintPopup (PanelContainer)\n      HintLabel (Label)\n    VignetteOverlay (ColorRect)\n    TooltipBar (ColorRect)\n      TopBorder (ColorRect)\n      NodeName (Label)\n      NodeDesc (Label)\n      Divider1 (ColorRect)\n      SynergyTitle (Label)\n      Synergy1 (Label)\n      Synergy2 (Label)\n      Divider2 (ColorRect)\n      StatTitle (Label)\n      StatATK (Label)\n      StatCooldown (Label)",
+
+  "scenes/BloodDrop.tscn": "BloodDrop (Node2D)",
+
+  "scenes/BloodEntity.tscn": "BloodEntity (Node2D)",
+
+  "scenes/Coffin.tscn": "Coffin (Area2D)\n  CollisionShape2D (CollisionShape2D)\n  Sprite2D (Sprite2D)",
+
+  "scenes/GameNode.tscn": "GameNode (Node2D)",
+
+  "scenes/GameWorld.tscn": "GameWorld (Node2D)\n  Coffin (instance: Coffin.tscn)",
+
+  "scenes/HeartPulse.tscn": "HeartPulse (Node2D)",
+
+  "scenes/StreamUI.tscn": "StreamUI (Node)\n  CanvasLayer (CanvasLayer)\n    TopBar (HBoxContainer)\n      LiveLabel (Label)\n      ViewersCount (Label)\n    ChatBox (VBoxContainer)\n      ScrollContainer (ScrollContainer)\n        ChatLog (VBoxContainer)\n    HUD (HBoxContainer)\n      BloodDisplay (Label)\n      SpecialDisplay (Label)\n      TimerDisplay (Label)\n      NodeSlotsDisplay (Label)\n    VelmireReaction (TextureRect)\n  ChatManager (Node)",
+
+  "scenes/VelmireReaction.tscn": "VelmireReaction (Node)",
+
+  "velmire.tscn": "Node2D (Node2D)"
+}

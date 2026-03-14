@@ -14,7 +14,7 @@ func setup(pos: Vector2, drop_value: float, coffin_center: Vector2) -> void:
 	global_position = pos
 	value = drop_value
 	_target = coffin_center
-	_size = clamp(drop_value * 2.0, 4.0, 16.0)
+	_size = clamp(drop_value * 2.5, 4.0, 20.0)
 	# 강하게 튕겨나감 - 관 반대 방향 기준으로 퍼짐
 	var away_dir: Vector2 = (pos - coffin_center).normalized()
 	var spread: float = randf_range(-0.6, 0.6)  # ±약 35도 퍼짐

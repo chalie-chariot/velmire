@@ -9,6 +9,7 @@ var _rotation_speed: float = 0.0
 var _points: PackedVector2Array = []
 var _is_slowed: bool = false
 var _base_radius: float = 35.0
+var radius: float = 27.0
 var _hp_bar_alpha: float = 0.0
 var _hp_bar_timer: float = 0.0
 var _hp_bar_duration: float = 2.0
@@ -20,11 +21,10 @@ func _ready() -> void:
 
 func _generate_points() -> void:
 	var num: int = randi_range(6, 9)
-	_base_radius = randf_range(27.0, 42.0)
 	_points.clear()
 	for i in range(num):
 		var angle: float = (2.0 * PI / num) * i
-		var r: float = _base_radius + randf_range(-8.0, 8.0)
+		var r: float = radius + randf_range(-8.0, 8.0)
 		_points.append(Vector2(cos(angle) * r, sin(angle) * r))
 
 func _get_smooth_points() -> PackedVector2Array:
@@ -63,36 +63,47 @@ func _draw() -> void:
 		var b: Vector2 = smooth[(i + 1) % smooth.size()]
 		draw_line(a, b, Color(0.6, 0.05, 0.05, 1.0), 1.5)
 
+	# HP바 (회전 무시 고정)
 	if _hp_bar_alpha > 0:
 		var angle: float = -rotation
 		var bar_w: float = 40.0
 		var bar_h: float = 5.0
 		var bar_offset: Vector2 = Vector2(0, -38).rotated(angle)
-		var bar_x: Vector2 = Vector2(cos(angle), sin(angle))
-		var bar_y: Vector2 = Vector2(-sin(angle), cos(angle))
+		var bx: Vector2 = Vector2(cos(angle), sin(angle))
+		var by: Vector2 = Vector2(-sin(angle), cos(angle))
 
-		var tl: Vector2 = bar_offset + bar_x * (-bar_w / 2) + bar_y * (-bar_h / 2)
-		var tr: Vector2 = bar_offset + bar_x * (bar_w / 2) + bar_y * (-bar_h / 2)
-		var br: Vector2 = bar_offset + bar_x * (bar_w / 2) + bar_y * (bar_h / 2)
-		var bl: Vector2 = bar_offset + bar_x * (-bar_w / 2) + bar_y * (bar_h / 2)
+		var tl = bar_offset + bx * (-bar_w/2) + by * (-bar_h/2)
+		var tr = bar_offset + bx * (bar_w/2) + by * (-bar_h/2)
+		var br = bar_offset + bx * (bar_w/2) + by * (bar_h/2)
+		var bl = bar_offset + bx * (-bar_w/2) + by * (bar_h/2)
 
+		# 배경
 		draw_colored_polygon(PackedVector2Array([tl, tr, br, bl]),
 			Color(0.15, 0.0, 0.0, _hp_bar_alpha * 0.9))
 
-		var tr_d: Vector2 = bar_offset + bar_x * (-bar_w / 2 + bar_w * _damage_bar_ratio) + bar_y * (-bar_h / 2)
-		var br_d: Vector2 = bar_offset + bar_x * (-bar_w / 2 + bar_w * _damage_bar_ratio) + bar_y * (bar_h / 2)
+		# 데미지바 (회색 지연)
+		var tr_d = bar_offset + bx * (-bar_w/2 + bar_w * _damage_bar_ratio) + by * (-bar_h/2)
+		var br_d = bar_offset + bx * (-bar_w/2 + bar_w * _damage_bar_ratio) + by * (bar_h/2)
 		draw_colored_polygon(PackedVector2Array([tl, tr_d, br_d, bl]),
 			Color(0.7, 0.7, 0.7, _hp_bar_alpha * 0.8))
 
+		# HP바 (빨강 즉시)
 		var hp_ratio: float = hp / max_hp
-		var tr_h: Vector2 = bar_offset + bar_x * (-bar_w / 2 + bar_w * hp_ratio) + bar_y * (-bar_h / 2)
-		var br_h: Vector2 = bar_offset + bar_x * (-bar_w / 2 + bar_w * hp_ratio) + bar_y * (bar_h / 2)
+		var tr_h = bar_offset + bx * (-bar_w/2 + bar_w * hp_ratio) + by * (-bar_h/2)
+		var br_h = bar_offset + bx * (-bar_w/2 + bar_w * hp_ratio) + by * (bar_h/2)
 		draw_colored_polygon(PackedVector2Array([tl, tr_h, br_h, bl]),
 			Color(1.0, 0.15, 0.15, _hp_bar_alpha))
 
 func take_damage(amount: float) -> void:
 	hp -= amount
+	_hp_bar_alpha = 1.0
+	_hp_bar_timer = _hp_bar_duration
 	_spawn_damage_number(amount)
+	# 데미지바 지연 감소
+	if hp > 0:
+		var tween: Tween = create_tween()
+		tween.tween_interval(0.6)
+		tween.tween_property(self, "_damage_bar_ratio", hp / max_hp, 0.4).set_ease(Tween.EASE_OUT)
 	if hp <= 0:
 		_spawn_death_effect()
 		_drop_blood()
@@ -107,16 +118,14 @@ func _spawn_death_effect() -> void:
 
 func _drop_blood() -> void:
 	var drop_scene = preload("res://scenes/BloodDrop.tscn")
-	# 크기에 비례한 드롭 수
-	var drop_count: int = 3
+	var drop_value: float = max(1.0, max_hp / 60.0)
 	var coffin_center = get_tree().get_first_node_in_group("coffin")
 	if not coffin_center:
 		return
 	var target: Vector2 = coffin_center.global_position + coffin_center.size / 2
-	for i in range(drop_count):
-		var drop = drop_scene.instantiate()
-		get_parent().add_child(drop)
-		drop.setup(global_position, 1.0, target)
+	var drop = drop_scene.instantiate()
+	get_parent().add_child(drop)
+	drop.setup(global_position, drop_value, target)
 
 func _spawn_damage_number(amount: float) -> void:
 	var label: Label = Label.new()

@@ -35,17 +35,13 @@ var _is_game_over: bool = false
 var _shake_intensity: float = 0.0
 var _shake_duration: float = 0.0
 var _vignette_tween: Tween
-var _hints: Array = [
-	"💡 Shift + 클릭으로 노드를 연결할 수 있어요",
-	"💡 흡혈 + 결계 연결 시 감속된 혈체에 데미지 2배",
-	"💡 흡혈 + 증폭 연결 시 공격 쿨다운 50% 감소",
-	"💡 결계 + 증폭 연결 시 감속 범위와 지속시간 2배",
-	"💡 Shift를 누르면 노드의 공격 범위를 확인할 수 있어요",
-	"💡 노드는 스킬 트리로 강화시킬 수 있어요",
-	"💡 관을 지키세요! HP가 0이 되면 게임오버",
+var _node_slots: Array = [
+	{"id": "absorb", "type": "흡혈", "color": Color(0.9, 0.1, 0.1), "cost": 10},
+	{"id": "freeze", "type": "결계", "color": Color(0.1, 0.3, 0.9), "cost": 15},
+	{"id": "resonate", "type": "증폭", "color": Color(0.1, 0.8, 0.2), "cost": 20},
 ]
-var _selected_hint: int = -1
 var _hint_hiding: bool = false
+var _elapsed_time: float = 0.0
 
 func _ready() -> void:
 	add_to_group("main")
@@ -65,11 +61,17 @@ func _ready() -> void:
 	$CanvasLayer/RightTab.gui_input.connect(_on_right_tab_gui_input)
 	$CanvasLayer/CoffinHPBar.modulate = Color(1, 1, 1, 0)
 	_hint_popup.visible = false
-	_spawn_test_nodes()
+	_spawn_start_nodes()
 	var synergy_engine = SynergyEngine.new()
 	add_child(synergy_engine)
 	_build_hint_dots()
+	$CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/SpecialRow.modulate = Color(1, 1, 1, 0.5)
+	ResourceManager.blood_changed.connect(_on_blood_changed)
+	ResourceManager.blood_changed.connect(update_blood_ui)
+	ResourceManager.special_changed.connect(_on_special_changed)
+	_on_blood_changed(ResourceManager.blood)
 	update_blood_ui(ResourceManager.blood)
+	_on_special_changed(ResourceManager.special)
 
 func show_tooltip(info: Dictionary, node_color: Color) -> void:
 	_tip_name.text = info.name
@@ -85,50 +87,121 @@ func show_tooltip(info: Dictionary, node_color: Color) -> void:
 func hide_tooltip() -> void:
 	_tooltip.visible = false
 
+func _spawn_start_nodes() -> void:
+	var node_scene = preload("res://scenes/GameNode.tscn")
+	var grid = $EntityLayer/HeartPulse
+
+	var start_nodes = [
+		{"id": "absorb", "type": "흡혈", "color": Color(0.9, 0.1, 0.1)},
+		{"id": "freeze", "type": "결계", "color": Color(0.1, 0.3, 0.9)},
+	]
+
+	for i in range(start_nodes.size()):
+		var data = start_nodes[i]
+		var node = node_scene.instantiate()
+		node.node_id = data.id
+		node.node_type = data.type
+		node.node_color = data.color
+		# 관 좌우에 배치
+		var offset_x: float = -120.0 if i == 0 else 120.0
+		var pos: Vector2 = Vector2(960 + offset_x, 600)
+		node.global_position = pos
+		node._slot_position = pos
+		# 그리드에 등록 + is_placed 설정 (SHIFT 시너지 연결 가능)
+		var cell: Vector2i = grid.world_to_grid(pos)
+		if grid.is_valid_cell(cell.x, cell.y) and grid.is_cell_empty(cell.x, cell.y):
+			grid.place_node(cell.x, cell.y, node.node_id)
+			node.is_placed = true
+			node.grid_col = cell.x
+			node.grid_row = cell.y
+		$EntityLayer.add_child(node)
+
 func _build_hint_dots() -> void:
-	var dot_size: int = 40
-	var spacing: int = 56
-	var total_width: int = _hints.size() * spacing
+	var slot_size: int = 70
+	var spacing: int = 100
+	var total_width: int = _node_slots.size() * spacing
 	var start_x: int = (1920 - total_width) / 2
 
-	for i in range(_hints.size()):
-		var dot: Button = Button.new()
-		dot.custom_minimum_size = Vector2(dot_size, dot_size)
-		dot.size = Vector2(dot_size, dot_size)
-		dot.position = Vector2(start_x + i * spacing, 30)
+	for i in range(_node_slots.size()):
+		var data = _node_slots[i]
 
+		var slot: Button = Button.new()
+		slot.custom_minimum_size = Vector2(slot_size, slot_size)
+		slot.size = Vector2(slot_size, slot_size)
+		slot.position = Vector2(start_x + i * spacing, 15)
+
+		# 노드 타입 이름
+		slot.text = data.type + "\n🩸" + str(data.cost)
+		slot.add_theme_font_size_override("font_size", 12)
+		slot.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.9))
+
+		# 슬롯 스타일
 		var style: StyleBoxFlat = StyleBoxFlat.new()
-		style.bg_color = Color(0.4, 0.05, 0.05, 0.85)
-		style.set_corner_radius_all(20)
-		dot.add_theme_stylebox_override("normal", style)
-		dot.add_theme_stylebox_override("hover",
-			_make_dot_style(Color(0.8, 0.15, 0.15, 0.95)))
-		dot.add_theme_stylebox_override("pressed",
-			_make_dot_style(Color(1.0, 0.3, 0.3, 1.0)))
-		var idx: int = i
-		dot.pressed.connect(func(): _on_dot_pressed(idx))
-		dot.modulate = Color(1, 1, 1, 0)
-		_dots_container.add_child(dot)
+		style.bg_color = Color(
+			data.color.r * 0.25,
+			data.color.g * 0.25,
+			data.color.b * 0.25, 0.92)
+		style.set_corner_radius_all(35)
+		style.border_color = Color(
+			data.color.r, data.color.g, data.color.b, 0.7)
+		style.border_width_left = 2
+		style.border_width_right = 2
+		style.border_width_top = 2
+		style.border_width_bottom = 2
+		slot.add_theme_stylebox_override("normal", style)
 
-func _make_dot_style(color: Color) -> StyleBoxFlat:
-	var s: StyleBoxFlat = StyleBoxFlat.new()
-	s.bg_color = color
-	s.set_corner_radius_all(20)
-	return s
+		# 호버 스타일
+		var hover: StyleBoxFlat = StyleBoxFlat.new()
+		hover.bg_color = Color(
+			data.color.r * 0.5,
+			data.color.g * 0.5,
+			data.color.b * 0.5, 1.0)
+		hover.set_corner_radius_all(35)
+		hover.border_color = Color(
+			data.color.r, data.color.g, data.color.b, 1.0)
+		hover.border_width_left = 2
+		hover.border_width_right = 2
+		hover.border_width_top = 2
+		hover.border_width_bottom = 2
+		slot.add_theme_stylebox_override("hover", hover)
 
-func _on_dot_pressed(index: int) -> void:
-	_hint_label.text = _hints[index]
-	_hint_popup.visible = true
-	_hint_popup.modulate = Color(1, 1, 1, 0)
-	_hint_popup.position = Vector2(_hint_popup.position.x, 930.0)
-	var tween: Tween = create_tween()
-	tween.tween_property(_hint_popup, "position:y", 900.0, 0.3
-	).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUART)
-	tween.parallel().tween_property(_hint_popup, "modulate", Color(1, 1, 1, 1), 0.3)
-	tween.tween_interval(4.0)
-	tween.tween_property(_hint_popup, "modulate", Color(1, 1, 1, 0), 0.4
-	).set_ease(Tween.EASE_IN)
-	tween.tween_callback(func(): _hint_popup.visible = false)
+		slot.modulate.a = 0.0
+		slot.pressed.connect(func(): _spawn_node_from_slot(i))
+		_dots_container.add_child(slot)
+
+func _spawn_node_from_slot(index: int) -> void:
+	var data = _node_slots[index]
+
+	# 재화 확인
+	if ResourceManager.blood < data.cost:
+		# 재화 부족 - 슬롯 흔들기
+		var slot = _dots_container.get_child(index)
+		var tween: Tween = create_tween()
+		tween.tween_property(slot, "position:x",
+			slot.position.x + 8, 0.05)
+		tween.tween_property(slot, "position:x",
+			slot.position.x - 8, 0.05)
+		tween.tween_property(slot, "position:x",
+			slot.position.x, 0.05)
+		return
+
+	# 재화 차감
+	ResourceManager.spend_blood(data.cost)
+
+	# 노드 스폰 (클릭한 인디케이터 슬롯 위에 배치 → 바로 드래그 가능)
+	var slot: Control = _dots_container.get_child(index)
+	var slot_center: Vector2 = slot.global_position + slot.size / 2
+	# 슬롯 바로 위에 생성 (인디케이터 영역에서 드래그 시작 가능)
+	var spawn_pos: Vector2 = slot_center + Vector2(0, -70)
+
+	var node_scene = preload("res://scenes/GameNode.tscn")
+	var node = node_scene.instantiate()
+	node.node_id = data.id
+	node.node_type = data.type
+	node.node_color = data.color
+	node.global_position = spawn_pos
+	node._slot_position = spawn_pos
+	$EntityLayer.add_child(node)
 
 func _get_hovered_game_node():
 	for n in get_tree().get_nodes_in_group("game_nodes"):
@@ -140,6 +213,15 @@ func _process(delta: float) -> void:
 	if _is_game_over:
 		_apply_shake(delta)
 		return
+	_elapsed_time += delta
+
+	# 난이도 단계 (30초마다)
+	var difficulty: int = int(_elapsed_time / 30.0)
+	spawn_interval = max(1.5, 4.0 - difficulty * 0.35)
+	max_entities = min(10, 4 + difficulty)
+	if ResourceManager:
+		ResourceManager.difficulty = difficulty
+
 	_blink_timer += delta
 	if _blink_timer >= 0.8:
 		_blink_timer = 0.0
@@ -166,12 +248,16 @@ func _process(delta: float) -> void:
 			_fade_hp_bar(false)
 
 	var my: float = get_viewport().get_mouse_position().y
-	if my > 880:
+	if my > 820:
 		_hint_hiding = false
 		if not _hint_area.visible:
 			_hint_area.visible = true
 			_hint_area.modulate = Color(1, 1, 1, 1)
-			_hint_area.position = Vector2(_hint_area.position.x, 980.0)
+			_hint_area.position = Vector2(_hint_area.position.x, 1020.0)
+
+			var area_tween: Tween = _hint_area.create_tween()
+			area_tween.tween_property(_hint_area, "position:y", 950.0, 0.35
+			).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 
 			var dots: Array = _dots_container.get_children()
 			for i in range(dots.size()):
@@ -187,6 +273,10 @@ func _process(delta: float) -> void:
 	else:
 		if _hint_area.visible and not _hint_hiding:
 			_hint_hiding = true
+			var area_tween: Tween = _hint_area.create_tween()
+			area_tween.tween_property(_hint_area, "position:y", 1020.0, 0.25
+			).set_ease(Tween.EASE_IN)
+
 			var dots: Array = _dots_container.get_children()
 			for i in range(dots.size()):
 				var dot: Control = dots[i]
@@ -211,25 +301,15 @@ func _process(delta: float) -> void:
 
 	_apply_shake(delta)
 
-func _spawn_test_nodes() -> void:
-	var node_scene = preload("res://scenes/GameNode.tscn")
-	var types = [
-		{"id": "absorb", "type": "흡혈", "color": Color(0.9, 0.1, 0.1)},
-		{"id": "freeze", "type": "결계", "color": Color(0.1, 0.3, 0.9)},
-		{"id": "resonate", "type": "증폭", "color": Color(0.1, 0.8, 0.2)},
-	]
-	for i in range(3):
-		var node = node_scene.instantiate()
-		node.node_id = types[i]["id"]
-		node.node_type = types[i]["type"]
-		node.node_color = types[i]["color"]
-		node._slot_position = Vector2(100, 300 + i * 120)
-		node.global_position = node._slot_position
-		$EntityLayer.add_child(node)
-
 func _spawn_blood_entity() -> void:
 	var entity = blood_entity_scene.instantiate()
 	entity.add_to_group("blood_entities")
+
+	var difficulty: int = int(_elapsed_time / 30.0)
+	entity.max_hp = 60.0 + difficulty * 20.0
+	entity.hp = entity.max_hp
+	entity.speed = 45.0 + difficulty * 7.0
+	entity.radius = 27.0 + difficulty * 2.0
 
 	var coffin_center: Vector2 = _coffin_rect.global_position + _coffin_rect.size / 2
 
@@ -502,6 +582,14 @@ func _slide_right_open() -> void:
 	_right_tween.tween_property(
 		$CanvasLayer/RightPanel, "modulate", Color(1, 1, 1, 1), 0.25
 	).set_ease(Tween.EASE_OUT)
+
+func _on_blood_changed(new_value: int) -> void:
+	$CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/BloodRow/BloodValue.text = "%d" % new_value
+
+func _on_special_changed(new_value: float) -> void:
+	$CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/SpecialRow/SpecialValue.text = "%d" % int(new_value)
+	var row: Control = $CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/SpecialRow
+	row.modulate = Color(1, 1, 1, 0.5 if new_value <= 0 else 1.0)
 
 func update_blood_ui(amount: float) -> void:
 	# TopBar에 혈액 재화 표시
