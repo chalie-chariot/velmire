@@ -5,6 +5,7 @@ extends Node2D
 @onready var _vignette: ColorRect = $CanvasLayer/VignetteOverlay
 @onready var _live_dot: Label = $CanvasLayer/TopBar/LiveDot
 @onready var _blood_label: Label = $CanvasLayer/TopBar/BloodLabel
+@onready var _timer_label: Label = $CanvasLayer/TopBar/TimerLabel
 @onready var _tooltip: ColorRect = $CanvasLayer/TooltipBar
 @onready var _tip_name: Label = $CanvasLayer/TooltipBar/NodeName
 @onready var _tip_desc: Label = $CanvasLayer/TooltipBar/NodeDesc
@@ -249,6 +250,8 @@ func _process(delta: float) -> void:
 	if ResourceManager:
 		ResourceManager.difficulty = difficulty
 
+	_timer_label.text = "%02d:%02d  [D%d]" % [int(_elapsed_time) / 60, int(_elapsed_time) % 60, difficulty]
+
 	_blink_timer += delta
 	if _blink_timer >= 0.8:
 		_blink_timer = 0.0
@@ -330,21 +333,18 @@ func _process(delta: float) -> void:
 
 func _spawn_blood_entity() -> void:
 	var difficulty: int = int(_elapsed_time / 30.0)
-	# 혈체 테스트: 4단계(Stage4)부터 스폰
-	var entity = preload("res://scenes/BloodEntityStage4.tscn").instantiate()
+	ResourceManager.difficulty = difficulty
+
+	var entity: Node2D
+	if difficulty >= 4:
+		var stage4_scene = preload("res://scenes/BloodEntityStage4.tscn")
+		entity = stage4_scene.instantiate()
+		entity._is_evolved = true
+		entity._difficulty = difficulty
+	else:
+		entity = blood_entity_scene.instantiate()
 
 	entity.add_to_group("blood_entities")
-
-	entity.max_hp = 60.0 + difficulty * 20.0
-	entity.hp = entity.max_hp
-	entity.speed = 45.0 + difficulty * 7.0
-	# Stage4: 기혈 - 동일 스케일 (radius 85 + diff)
-	entity.radius = 85.0 + difficulty * 2.0
-	if entity.has_method("_generate_points"):
-		entity._generate_points()
-	elif entity.has_method("_generate_tendrils"):
-		entity._generate_tendrils()
-
 	var coffin_center: Vector2 = _coffin_rect.global_position + _coffin_rect.size / 2
 
 	var side: int = randi() % 4
@@ -357,12 +357,29 @@ func _spawn_blood_entity() -> void:
 
 	entity.global_position = pos
 	entity.target = coffin_center
+	entity.radius = 27.0 + difficulty * 2.0
+	entity.max_hp = 60.0 + difficulty * 20.0
+	entity.hp = entity.max_hp
+	entity.speed = 45.0 + difficulty * 7.0
+	if entity.get("_damage_bar_ratio") != null:
+		entity._damage_bar_ratio = 1.0
+
+	if entity.has_method("_generate_points"):
+		entity._generate_points()
+	elif entity.has_method("_generate_tendrils"):
+		entity._generate_tendrils()
+
 	$EntityLayer.add_child(entity)
 
 func _check_coffin_collision() -> void:
 	var coffin_rect: Rect2 = Rect2(_coffin_rect.global_position, _coffin_rect.size)
 	for entity in get_tree().get_nodes_in_group("blood_entities"):
-		if coffin_rect.has_point(entity.global_position):
+		var r: float = entity.radius if "radius" in entity else 30.0
+		var expanded: Rect2 = Rect2(
+			coffin_rect.position - Vector2(r, r),
+			coffin_rect.size + Vector2(r * 2, r * 2)
+		)
+		if expanded.has_point(entity.global_position):
 			entity.remove_from_group("blood_entities")
 			entity.queue_free()
 			coffin_hp -= 10.0

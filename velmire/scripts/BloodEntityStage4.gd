@@ -15,6 +15,8 @@ var _tendrils: Array = []
 var _tendril_count: int = 7
 var _silhouette_pts: PackedVector2Array = []  # 다각형 실루엣
 var _nucleus_pts: PackedVector2Array = []    # 유기체 핵 (불규칙 형태)
+var _is_evolved: bool = false  # 4단계 이상: 촉수, 핵, 맥박 (0~3: 다각형만)
+var _difficulty: int = 0  # 난이도(단계) - 크기/색 구분용
 var _is_slowed: bool = false
 var _hp_bar_alpha: float = 0.0
 var _hp_bar_timer: float = 0.0
@@ -23,8 +25,9 @@ var _damage_bar_ratio: float = 1.0
 func _ready() -> void:
 	add_to_group("blood_entities")
 	_generate_silhouette()
-	_generate_nucleus()
-	_generate_tendrils()
+	if _is_evolved:
+		_generate_nucleus()
+		_generate_tendrils()
 
 func _generate_silhouette() -> void:
 	_silhouette_pts.clear()
@@ -132,67 +135,76 @@ func _draw() -> void:
 		var glow_pts: PackedVector2Array = []
 		for p in smooth:
 			glow_pts.append(p * 1.12)
-		draw_colored_polygon(glow_pts, Color(0.04, 0.04, 0.04, 0.55))
-		draw_colored_polygon(smooth, Color(0.05, 0.05, 0.05, 0.95))
+		if _is_evolved:
+			draw_colored_polygon(glow_pts, Color(0.04, 0.04, 0.04, 0.55))
+			draw_colored_polygon(smooth, Color(0.05, 0.05, 0.05, 0.95))
+		else:
+			draw_colored_polygon(glow_pts, Color(0.35, 0.03, 0.03, 0.6))
+			draw_colored_polygon(smooth, Color(0.42, 0.04, 0.04, 0.98))
 	else:
-		draw_circle(Vector2.ZERO, radius * 1.15, Color(0.04, 0.04, 0.04, 0.55))
-		draw_circle(Vector2.ZERO, radius * 0.95, Color(0.05, 0.05, 0.05, 0.95))
+		if _is_evolved:
+			draw_circle(Vector2.ZERO, radius * 1.15, Color(0.04, 0.04, 0.04, 0.55))
+			draw_circle(Vector2.ZERO, radius * 0.95, Color(0.05, 0.05, 0.05, 0.95))
+		else:
+			draw_circle(Vector2.ZERO, radius * 1.15, Color(0.35, 0.03, 0.03, 0.6))
+			draw_circle(Vector2.ZERO, radius * 0.95, Color(0.42, 0.04, 0.04, 0.98))
 
-	for tendril in _tendrils:
-		var phase: float = tendril.phase
-		var w_base: float = tendril.width_base
-		var curl: float = tendril.curl
+	if _is_evolved:
+		for tendril in _tendrils:
+			var phase: float = tendril.phase
+			var w_base: float = tendril.width_base
+			var curl: float = tendril.curl
 
-		var animated_ctrl: Array = []
-		for k in range(tendril.ctrl.size()):
-			var base_pt: Vector2 = tendril.ctrl[k]
-			var t: float = float(k) / (tendril.ctrl.size() - 1)
-			var wave: float = sin(_time * 2.2 + phase + k * 1.2) * (5.0 * t)
-			wave += sin(_time * 1.5 + phase * 0.7 + k * 1.5) * (3.0 * t)
-			var perp: Vector2 = base_pt.normalized().rotated(PI/2 + curl)
-			animated_ctrl.append(base_pt + perp * wave)
+			var animated_ctrl: Array = []
+			for k in range(tendril.ctrl.size()):
+				var base_pt: Vector2 = tendril.ctrl[k]
+				var t: float = float(k) / (tendril.ctrl.size() - 1)
+				var wave: float = sin(_time * 2.2 + phase + k * 1.2) * (5.0 * t)
+				wave += sin(_time * 1.5 + phase * 0.7 + k * 1.5) * (3.0 * t)
+				var perp: Vector2 = base_pt.normalized().rotated(PI/2 + curl)
+				animated_ctrl.append(base_pt + perp * wave)
 
-		var pts: PackedVector2Array = _get_catmull_pts(animated_ctrl)
-		var total_len: float = 0.0
-		for i in range(pts.size() - 1):
-			total_len += pts[i].distance_to(pts[i+1])
+			var pts: PackedVector2Array = _get_catmull_pts(animated_ctrl)
+			var total_len: float = 0.0
+			for i in range(pts.size() - 1):
+				total_len += pts[i].distance_to(pts[i+1])
 
-		var seg_len: float = 0.0
-		for i in range(pts.size() - 1):
-			seg_len += pts[i].distance_to(pts[i+1])
-			var t: float = seg_len / total_len
-			var w: float = w_base * (2.0 - 1.7 * t)
-			w = max(w, 1.2)
-			var outline_col: Color = Color(0.55, 0.02, 0.02, 0.98).lerp(Color(0.02, 0.0, 0.0, 0.98), 1.0 - t)
-			draw_line(pts[i], pts[i+1], outline_col, w + 2.0)
+			var seg_len: float = 0.0
+			for i in range(pts.size() - 1):
+				seg_len += pts[i].distance_to(pts[i+1])
+				var t: float = seg_len / total_len
+				var w: float = w_base * (2.0 - 1.7 * t)
+				w = max(w, 1.2)
+				var outline_col: Color = Color(0.55, 0.02, 0.02, 0.98).lerp(Color(0.02, 0.0, 0.0, 0.98), 1.0 - t)
+				draw_line(pts[i], pts[i+1], outline_col, w + 2.0)
 
-		seg_len = 0.0
-		for i in range(pts.size() - 1):
-			seg_len += pts[i].distance_to(pts[i+1])
-			var t: float = seg_len / total_len
-			var w: float = w_base * (2.0 - 1.7 * t)
-			w = max(w, 1.2)
-			var line_col: Color = Color(0.65 + t * 0.1, 0.02, 0.02, 0.95).lerp(Color(0.03, 0.0, 0.0, 0.95), 1.0 - t)
-			draw_line(pts[i], pts[i+1], line_col, w)
-
-		if _pulsing:
-			var pulse_pos: float = clampf(_pulse_radius / (radius * 1.2), 0.0, 1.0)
-			var pulse_width: float = 0.28
 			seg_len = 0.0
 			for i in range(pts.size() - 1):
 				seg_len += pts[i].distance_to(pts[i+1])
 				var t: float = seg_len / total_len
-				var dist_to_pulse: float = abs(t - pulse_pos)
-				var pulse_glow: float = max(0.0, 1.0 - dist_to_pulse / pulse_width) * _pulse_alpha
-				if pulse_glow > 0.02:
-					var w: float = w_base * (2.0 - 1.7 * t) * 0.7
-					w = max(w, 1.0)
-					var glow_col: Color = Color(1.0, 0.35, 0.35, clampf(pulse_glow * 1.1, 0.0, 1.0)).lerp(Color(0.35, 0.02, 0.02, pulse_glow * 0.6), 1.0 - t)
-					draw_line(pts[i], pts[i+1], Color(0.9, 0.15, 0.15, pulse_glow * 0.25), w + 10.0)
-					draw_line(pts[i], pts[i+1], Color(1.0, 0.2, 0.2, glow_col.a * 0.45), w + 4.0)
-					draw_line(pts[i], pts[i+1], glow_col, w)
+				var w: float = w_base * (2.0 - 1.7 * t)
+				w = max(w, 1.2)
+				var line_col: Color = Color(0.65 + t * 0.1, 0.02, 0.02, 0.95).lerp(Color(0.03, 0.0, 0.0, 0.95), 1.0 - t)
+				draw_line(pts[i], pts[i+1], line_col, w)
 
-	if _nucleus_pts.size() >= 3:
+			if _pulsing:
+				var pulse_pos: float = clampf(_pulse_radius / (radius * 1.2), 0.0, 1.0)
+				var pulse_width: float = 0.28
+				seg_len = 0.0
+				for i in range(pts.size() - 1):
+					seg_len += pts[i].distance_to(pts[i+1])
+					var t: float = seg_len / total_len
+					var dist_to_pulse: float = abs(t - pulse_pos)
+					var pulse_glow: float = max(0.0, 1.0 - dist_to_pulse / pulse_width) * _pulse_alpha
+					if pulse_glow > 0.02:
+						var w: float = w_base * (2.0 - 1.7 * t) * 0.7
+						w = max(w, 1.0)
+						var glow_col: Color = Color(1.0, 0.35, 0.35, clampf(pulse_glow * 1.1, 0.0, 1.0)).lerp(Color(0.35, 0.02, 0.02, pulse_glow * 0.6), 1.0 - t)
+						draw_line(pts[i], pts[i+1], Color(0.9, 0.15, 0.15, pulse_glow * 0.25), w + 10.0)
+						draw_line(pts[i], pts[i+1], Color(1.0, 0.2, 0.2, glow_col.a * 0.45), w + 4.0)
+						draw_line(pts[i], pts[i+1], glow_col, w)
+
+	if _is_evolved and _nucleus_pts.size() >= 3:
 		var wobble: float = 0.02 * sin(_time * 2.5)
 		var outer: PackedVector2Array = []
 		var mid: PackedVector2Array = []
@@ -218,7 +230,7 @@ func _draw() -> void:
 		draw_circle(core_offset, radius * 0.12, Color(0.7, 0.0, 0.0, 0.4))
 		draw_circle(core_offset, radius * 0.08, Color(0.9, 0.1, 0.1, 0.55))
 		draw_circle(core_offset, radius * 0.06, Color(0.95, 0.25, 0.25, 0.85))
-	else:
+	elif _is_evolved:
 		draw_circle(Vector2.ZERO, radius * 0.5, Color(0.5, 0.0, 0.0, 0.25))
 		draw_circle(Vector2.ZERO, radius * 0.4, Color(0.55, 0.0, 0.0, 0.38))
 		draw_circle(Vector2.ZERO, radius * 0.32, Color(0.15, 0.0, 0.0, 1.0))
@@ -309,4 +321,4 @@ func _drop_blood() -> void:
 		var drop = drop_scene.instantiate()
 		get_parent().add_child(drop)
 		var drop_value: float = max(1.0, max_hp / 60.0)
-		drop.setup(global_position, drop_value, target_pos, true)
+		drop.setup(global_position, drop_value, target_pos, _is_evolved)
