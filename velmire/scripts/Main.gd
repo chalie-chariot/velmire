@@ -166,10 +166,16 @@ func _build_hint_dots() -> void:
 		slot.add_theme_stylebox_override("hover", hover)
 
 		slot.modulate.a = 0.0
-		slot.pressed.connect(func(): _spawn_node_from_slot(i))
+		slot.gui_input.connect(func(e): _on_slot_gui_input(e, i))
 		_dots_container.add_child(slot)
 
-func _spawn_node_from_slot(index: int) -> void:
+func _on_slot_gui_input(event: InputEvent, index: int) -> void:
+	if not event is InputEventMouseButton:
+		return
+	var mb: InputEventMouseButton = event
+	if mb.button_index != MOUSE_BUTTON_LEFT or not mb.pressed:
+		return
+
 	var data = _node_slots[index]
 
 	# 재화 확인
@@ -188,10 +194,9 @@ func _spawn_node_from_slot(index: int) -> void:
 	# 재화 차감
 	ResourceManager.spend_blood(data.cost)
 
-	# 노드 스폰 (클릭한 인디케이터 슬롯 위에 배치 → 바로 드래그 가능)
+	# 슬롯 위치에 노드 스폰 후 바로 드래그 시작
 	var slot: Control = _dots_container.get_child(index)
 	var slot_center: Vector2 = slot.global_position + slot.size / 2
-	# 슬롯 바로 위에 생성 (인디케이터 영역에서 드래그 시작 가능)
 	var spawn_pos: Vector2 = slot_center + Vector2(0, -70)
 
 	var node_scene = preload("res://scenes/GameNode.tscn")
@@ -202,6 +207,12 @@ func _spawn_node_from_slot(index: int) -> void:
 	node.global_position = spawn_pos
 	node._slot_position = spawn_pos
 	$EntityLayer.add_child(node)
+
+	# 마우스 다운 위치에서 즉시 드래그 시작
+	node._start_drag()
+
+	# 이벤트 처리 완료 표시 (Button 기본 동작 방지)
+	get_viewport().set_input_as_handled()
 
 func _get_hovered_game_node():
 	for n in get_tree().get_nodes_in_group("game_nodes"):

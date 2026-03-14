@@ -24,13 +24,16 @@ func _clear_all_synergies() -> void:
 		n.synergy_fast_cooldown = false
 		n.attack_cooldown = 3.0 if n.node_type != "흡혈" else 2.0
 		n.synergy_wide_slow = false
+		n.synergy_active = false
 
 func _apply_synergy(a: Node, b: Node) -> void:
 	var types: Array = [a.node_type, b.node_type]
 
 	if types.has("흡혈") and types.has("결계"):
 		var absorb = a if a.node_type == "흡혈" else b
+		var freeze = a if a.node_type == "결계" else b
 		absorb.synergy_double_damage = true
+		freeze.synergy_active = true  # 결계도 시너지 활성 표시
 
 	if types.has("흡혈") and types.has("증폭"):
 		var absorb = a if a.node_type == "흡혈" else b

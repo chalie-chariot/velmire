@@ -19,6 +19,7 @@ var _attack_timer: float = 0.0
 var synergy_double_damage: bool = false
 var synergy_fast_cooldown: bool = false
 var synergy_wide_slow: bool = false
+var synergy_active: bool = false
 var _phase_offset: float = 0.0
 var is_hovered: bool = false
 var is_highlighted: bool = false
@@ -257,9 +258,10 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, radius * 1.5, 0, TAU, 64,
 			Color(node_color.r, node_color.g, node_color.b, 0.5), 2.0)
 
-	# 1. 일반 선택 범위 (클릭 - 200)
+	# 1. 일반 선택 범위 (클릭 - 시너지 등 적용된 실시간 범위)
 	if is_selected and is_placed:
-		draw_arc(Vector2.ZERO, 200.0, 0, TAU, 128,
+		var range_val: float = _get_ability_range()
+		draw_arc(Vector2.ZERO, range_val, 0, TAU, 128,
 			Color(node_color.r, node_color.g, node_color.b, 0.8), 1.5)
 
 	# 2. SHIFT 연결 범위 (_is_first_selected - 400 그라데이션)

@@ -4,7 +4,7 @@ signal resource_changed(type: String, new_value: Variant)
 signal blood_changed(new_value: int)
 signal special_changed(new_value: float)
 
-var blood: int = 0
+var blood: int = 200  # 테스트용 초기값
 var special: float = 0.0
 var node_fragments: int = 0
 var difficulty: int = 0
