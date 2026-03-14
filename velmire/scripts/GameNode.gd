@@ -287,19 +287,6 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, radius * 1.8, 0, TAU, 64,
 			Color(1.0, 1.0, 0.5, pulse * 0.3), 1.5)
 
-	# 임시 디버그 텍스트: 시너지 연결 시 [흡혈] 시너지=A, [결계] 시너지=B
-	var font: Font = ThemeDB.fallback_font
-	var debug_str: String = ""
-	if synergy_double_damage or synergy_fast_cooldown:
-		debug_str = "A"
-	elif synergy_wide_slow:
-		debug_str = "B"
-	if debug_str != "":
-		draw_string(font, Vector2(0, -radius - 20),
-			debug_str,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
-			Color(1.0, 1.0, 0.0, 1.0))
-
 func _get_ability_range() -> float:
 	match node_type:
 		"흡혈":

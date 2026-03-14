@@ -41,6 +41,22 @@ var _node_slots: Array = [
 	{"id": "resonate", "type": "증폭", "color": Color(0.1, 0.8, 0.2), "cost": 20},
 ]
 var _hint_hiding: bool = false
+
+# ===== 난이도 단계 (30초마다 증가) =====
+# 단계 0~3   혈체(血體)   기본 핏덩어리
+# 단계 4~5   기혈(寄血)   기생하는 피 - 핵이 숙주처럼 내부에 자리잡음
+# 단계 6~7   숙혈(宿血)   숙주가 된 피 - 줄기가 뻗어 주변을 잠식
+# 단계 8~9   침혈(侵血)   침식하는 피 - 완전히 다른 형태로 변이
+# 단계 10+   혈왕(血王)   모든 혈체를 지배하는 존재
+# ------------------------------------------
+# 단계 0 (0~30초):  스폰간격 4.0s / 최대 4개 / HP 60  / 속도 45 / radius 27
+# 단계 1 (30~60초): 스폰간격 3.65s / 최대 5개 / HP 80  / 속도 52 / radius 29
+# 단계 2 (60~90초): 스폰간격 3.3s  / 최대 6개 / HP 100 / 속도 59 / radius 31
+# 단계 3 (90~120s): 스폰간격 2.95s / 최대 7개 / HP 120 / 속도 66 / radius 33
+# 단계 4 (120~150s): 기혈 스폰 시작
+#                   스폰간격 2.6s  / 최대 8개 / HP 140 / 속도 73 / radius 35
+# 단계 5 (150s+):   스폰간격 2.25s / 최대 9개 / HP 160 / 속도 80 / radius 37
+# ==========================================
 var _elapsed_time: float = 0.0
 
 func _ready() -> void:
@@ -314,18 +330,16 @@ func _process(delta: float) -> void:
 
 func _spawn_blood_entity() -> void:
 	var difficulty: int = int(_elapsed_time / 30.0)
-	var entity
-	if difficulty >= 4:
-		entity = preload("res://scenes/BloodEntityStage4.tscn").instantiate()
-	else:
-		entity = blood_entity_scene.instantiate()
+	# 혈체 테스트: 4단계(Stage4)부터 스폰
+	var entity = preload("res://scenes/BloodEntityStage4.tscn").instantiate()
 
 	entity.add_to_group("blood_entities")
 
 	entity.max_hp = 60.0 + difficulty * 20.0
 	entity.hp = entity.max_hp
 	entity.speed = 45.0 + difficulty * 7.0
-	entity.radius = 27.0 + difficulty * 2.0
+	# Stage4: 기혈 - 동일 스케일 (radius 85 + diff)
+	entity.radius = 85.0 + difficulty * 2.0
 	if entity.has_method("_generate_points"):
 		entity._generate_points()
 	elif entity.has_method("_generate_tendrils"):
