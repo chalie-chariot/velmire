@@ -26,6 +26,10 @@ var is_pending_connection: bool = false
 var _shift_held: bool = false
 var _is_first_selected: bool = false
 var is_selected: bool = false
+var _mouse_down_for_click: bool = false
+var _mouse_down_pos: Vector2 = Vector2.ZERO
+
+const _DRAG_THRESHOLD: float = 10.0
 
 func _ready() -> void:
 	_generate_base_points()
@@ -42,11 +46,46 @@ func _generate_base_points() -> void:
 		var r: float = radius
 		_base_points.append(Vector2(cos(angle) * r, sin(angle) * r))
 
+func _start_drag() -> void:
+	var prev_col := grid_col
+	var prev_row := grid_row
+	if is_placed:
+		var grid = get_tree().get_first_node_in_group("heart_pulse")
+		if grid and prev_col >= 0 and prev_row >= 0:
+			grid.remove_node(prev_col, prev_row)
+		is_placed = false
+		grid_col = -1
+		grid_row = -1
+	is_dragging = true
+	_drag_offset = global_position - get_global_mouse_position()
+	_slot_position = global_position
+
 func _deselect_all_others() -> void:
 	var nodes = get_tree().get_nodes_in_group("game_nodes")
 	for n in nodes:
 		if n != self:
 			n.is_selected = false
+
+func _is_topmost_hovered() -> bool:
+	var mouse_pos: Vector2 = get_global_mouse_position()
+	var local_pos: Vector2 = to_local(mouse_pos)
+
+	# 내 원 안에 있는지 먼저 확인
+	if local_pos.length() > radius + 10.0:
+		return false
+
+	# 같은 원 안에 있는 다른 노드 중
+	# 씬 트리에서 나보다 나중에 추가된 노드(위에 그려진) 있으면 false
+	var nodes = get_tree().get_nodes_in_group("game_nodes")
+	for n in nodes:
+		if n == self:
+			continue
+		var n_local: Vector2 = n.to_local(mouse_pos)
+		if n_local.length() <= n.radius + 10.0:
+			# 둘 다 클릭 범위 안 → 씬 트리 순서로 판단
+			if n.get_index() > get_index():
+				return false
+	return true
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -54,7 +93,22 @@ func _input(event: InputEvent) -> void:
 		var is_hover: bool = local_pos.length() <= radius + 10.0
 
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-			if is_hover:
+			if not Input.is_key_pressed(KEY_SHIFT):
+				# 모든 노드의 _is_first_selected 강제 초기화
+				var all_nodes = get_tree().get_nodes_in_group("game_nodes")
+				for n in all_nodes:
+					n._is_first_selected = false
+					n.is_pending_connection = false
+				# ConnectionManager pending 초기화
+				var cm = get_tree().get_first_node_in_group("connection_manager")
+				if cm and cm._pending != null:
+					cm._pending.is_pending_connection = false
+					cm._pending._is_first_selected = false
+					cm._clear_highlights()
+					cm._pending = null
+					cm.queue_redraw()
+
+			if is_hover and _is_topmost_hovered():
 				if Input.is_key_pressed(KEY_SHIFT) and is_placed:
 					# SHIFT + 좌클릭
 					var cm = get_tree().get_first_node_in_group("connection_manager")
@@ -66,30 +120,24 @@ func _input(event: InputEvent) -> void:
 					get_viewport().set_input_as_handled()
 				elif not Input.is_key_pressed(KEY_SHIFT):
 					if is_selected:
-						# 이미 선택된 노드 재클릭 → 선택 해제 (노드 밖 클릭과 동일)
+						# 이미 선택된 노드 재클릭 → 선택 해제
+						var cm_sel = get_tree().get_first_node_in_group("connection_manager")
+						if cm_sel and cm_sel.has_method("clear_selected"):
+							cm_sel.clear_selected()
 						is_selected = false
 					else:
-						# 선택 + 드래그
-						_deselect_all_others()
-						is_selected = true
-						var prev_col := grid_col
-						var prev_row := grid_row
-						if is_placed:
-							var grid = get_tree().get_first_node_in_group("heart_pulse")
-							if grid and prev_col >= 0 and prev_row >= 0:
-								grid.remove_node(prev_col, prev_row)
-							is_placed = false
-							grid_col = -1
-							grid_row = -1
-						is_dragging = true
-						_drag_offset = global_position - get_global_mouse_position()
-						_slot_position = global_position
+						# 클릭 vs 드래그 구분: 우선 대기
+						_mouse_down_for_click = true
+						_mouse_down_pos = get_global_mouse_position()
 					get_viewport().set_input_as_handled()
 			else:
 				# 다른 곳 클릭 시 선택 해제
+				var cm_sel = get_tree().get_first_node_in_group("connection_manager")
+				if cm_sel and cm_sel.has_method("clear_selected"):
+					cm_sel.clear_selected()
 				is_selected = false
 
-		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed and is_hover:
+		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed and is_hover and _is_topmost_hovered():
 			# 우클릭 → 시너지 연결 해제
 			if is_placed:
 				var cm = get_tree().get_first_node_in_group("connection_manager")
@@ -97,9 +145,32 @@ func _input(event: InputEvent) -> void:
 					cm.disconnect_from(self)
 				get_viewport().set_input_as_handled()
 
-		elif event.button_index == MOUSE_BUTTON_LEFT and not event.pressed and is_dragging:
-			is_dragging = false
-			_try_place_on_grid()
+		elif event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+			if is_dragging:
+				is_dragging = false
+				_try_place_on_grid()
+				is_selected = false  # 드래그로 이동했을 때는 외곽선 숨김
+				get_viewport().set_input_as_handled()
+			elif _mouse_down_for_click and is_hover and _is_topmost_hovered():
+				# 클릭만 했을 때 → 선택 (외곽선 표시)
+				_deselect_all_others()
+				is_selected = true
+				var cm_sel = get_tree().get_first_node_in_group("connection_manager")
+				if cm_sel and cm_sel.has_method("set_selected"):
+					cm_sel.set_selected(self)
+				_mouse_down_for_click = false
+				get_viewport().set_input_as_handled()
+			else:
+				_mouse_down_for_click = false
+
+	if event is InputEventMouseMotion and _mouse_down_for_click:
+		var dist: float = _mouse_down_pos.distance_to(get_global_mouse_position())
+		if dist > _DRAG_THRESHOLD:
+			_mouse_down_for_click = false
+			var cm_motion = get_tree().get_first_node_in_group("connection_manager")
+			if cm_motion and cm_motion.has_method("clear_selected"):
+				cm_motion.clear_selected()
+			_start_drag()
 			get_viewport().set_input_as_handled()
 
 	if event is InputEventKey:
@@ -186,12 +257,12 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, radius * 1.5, 0, TAU, 64,
 			Color(node_color.r, node_color.g, node_color.b, 0.5), 2.0)
 
-	# 클릭 선택 시 범위 표시
+	# 1. 일반 선택 범위 (클릭 - 200)
 	if is_selected and is_placed:
 		draw_arc(Vector2.ZERO, 200.0, 0, TAU, 128,
 			Color(node_color.r, node_color.g, node_color.b, 0.8), 1.5)
 
-	# SHIFT 연결 첫 번째 선택 시 범위 표시 (그라데이션 원)
+	# 2. SHIFT 연결 범위 (_is_first_selected - 400 그라데이션)
 	if _is_first_selected and is_placed:
 		var rings: int = 40
 		for i in range(rings, 0, -1):
@@ -213,6 +284,19 @@ func _draw() -> void:
 			Color(1.0, 1.0, 0.5, pulse * 0.8), 2.5)
 		draw_arc(Vector2.ZERO, radius * 1.8, 0, TAU, 64,
 			Color(1.0, 1.0, 0.5, pulse * 0.3), 1.5)
+
+	# 임시 디버그 텍스트: 시너지 연결 시 [흡혈] 시너지=A, [결계] 시너지=B
+	var font: Font = ThemeDB.fallback_font
+	var debug_str: String = ""
+	if synergy_double_damage or synergy_fast_cooldown:
+		debug_str = "A"
+	elif synergy_wide_slow:
+		debug_str = "B"
+	if debug_str != "":
+		draw_string(font, Vector2(0, -radius - 20),
+			debug_str,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
+			Color(1.0, 1.0, 0.0, 1.0))
 
 func _get_ability_range() -> float:
 	match node_type:

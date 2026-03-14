@@ -302,14 +302,23 @@ func _process(delta: float) -> void:
 	_apply_shake(delta)
 
 func _spawn_blood_entity() -> void:
-	var entity = blood_entity_scene.instantiate()
+	var difficulty: int = int(_elapsed_time / 30.0)
+	var entity
+	if difficulty >= 4:
+		entity = preload("res://scenes/BloodEntityStage4.tscn").instantiate()
+	else:
+		entity = blood_entity_scene.instantiate()
+
 	entity.add_to_group("blood_entities")
 
-	var difficulty: int = int(_elapsed_time / 30.0)
 	entity.max_hp = 60.0 + difficulty * 20.0
 	entity.hp = entity.max_hp
 	entity.speed = 45.0 + difficulty * 7.0
 	entity.radius = 27.0 + difficulty * 2.0
+	if entity.has_method("_generate_points"):
+		entity._generate_points()
+	elif entity.has_method("_generate_tendrils"):
+		entity._generate_tendrils()
 
 	var coffin_center: Vector2 = _coffin_rect.global_position + _coffin_rect.size / 2
 

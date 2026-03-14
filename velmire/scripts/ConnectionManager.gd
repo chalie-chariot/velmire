@@ -2,6 +2,7 @@ extends Node2D
 
 var _connections: Array = []
 var _pending: Node2D = null
+var _selected: Node2D = null  # 일반 클릭으로 선택된 노드 (SHIFT 누르면 범위 표시)
 
 func _ready() -> void:
 	add_to_group("connection_manager")
@@ -14,7 +15,24 @@ func _input(event: InputEvent) -> void:
 				_pending._is_first_selected = false
 				_clear_highlights()
 				_pending = null
-				queue_redraw()
+			else:
+				_selected = null
+			queue_redraw()
+		elif event.keycode == KEY_SHIFT:
+			if event.pressed:
+				if _pending == null and _selected:
+					# 일반 클릭 후 SHIFT 누름 → 범위 표시
+					start_connect(_selected)
+					_selected = null
+			else:
+				# SHIFT 뗌 → 범위 해제 (누르는 동안에만 유지)
+				if _pending:
+					_selected = _pending  # 다음 SHIFT에서 바로 범위 표시되도록 복원
+					_pending.is_pending_connection = false
+					_pending._is_first_selected = false
+					_clear_highlights()
+					_pending = null
+					queue_redraw()
 
 func start_connect(node: Node2D) -> void:
 	# 같은 노드 재클릭 → 취소
@@ -78,8 +96,14 @@ func disconnect_node(node: Node2D) -> void:
 func get_pending() -> Node2D:
 	return _pending
 
-func set_last_placed(_node: Node2D) -> void:
-	pass  # 호환용 (GameNode _try_place_on_grid에서 호출)
+func set_selected(node: Node2D) -> void:
+	_selected = node
+
+func clear_selected() -> void:
+	_selected = null
+
+func set_last_placed(node: Node2D) -> void:
+	_selected = node  # 최근 배치 노드 → SHIFT 누르면 해당 노드 연결 범위 표시
 
 func _highlight_nearby_nodes(source: Node2D) -> void:
 	var nodes = source.get_tree().get_nodes_in_group("game_nodes")
