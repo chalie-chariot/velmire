@@ -60,6 +60,8 @@ var _hint_hiding: bool = false
 # 단계 5 (150s+):   스폰간격 2.25s / 최대 9개 / HP 160 / 속도 80 / radius 37
 # ==========================================
 var _elapsed_time: float = 0.0
+var _round_time: float = 30.0  # 테스트용 30초 (원래 120초)
+var _remaining_time: float = 30.0
 
 func _ready() -> void:
 	add_to_group("main")
@@ -187,6 +189,51 @@ func _build_hint_dots() -> void:
 		slot.gui_input.connect(func(e): _on_slot_gui_input(e, i))
 		_dots_container.add_child(slot)
 
+	# 재화 표시: 배경 박스 + 라벨
+	var blood_bg: ColorRect = ColorRect.new()
+	blood_bg.name = "BloodBG"
+	blood_bg.color = Color(0.05, 0.0, 0.0, 0.88)
+	blood_bg.size = Vector2(120, 44)
+	blood_bg.position = Vector2(1920 / 2 - 60, -82)
+	_dots_container.add_child(blood_bg)
+
+	# 테두리 (검붉은 띠) - 상하좌우
+	var blood_border_top: ColorRect = ColorRect.new()
+	blood_border_top.color = Color(0.5, 0.0, 0.0, 0.9)
+	blood_border_top.size = Vector2(120, 2)
+	blood_border_top.position = Vector2(0, 0)
+	blood_bg.add_child(blood_border_top)
+
+	var blood_border_bottom: ColorRect = ColorRect.new()
+	blood_border_bottom.color = Color(0.5, 0.0, 0.0, 0.9)
+	blood_border_bottom.size = Vector2(120, 2)
+	blood_border_bottom.position = Vector2(0, 42)
+	blood_bg.add_child(blood_border_bottom)
+
+	var blood_border_left: ColorRect = ColorRect.new()
+	blood_border_left.color = Color(0.5, 0.0, 0.0, 0.9)
+	blood_border_left.size = Vector2(2, 44)
+	blood_border_left.position = Vector2(0, 0)
+	blood_bg.add_child(blood_border_left)
+
+	var blood_border_right: ColorRect = ColorRect.new()
+	blood_border_right.color = Color(0.5, 0.0, 0.0, 0.9)
+	blood_border_right.size = Vector2(2, 44)
+	blood_border_right.position = Vector2(118, 0)
+	blood_bg.add_child(blood_border_right)
+
+	# 재화 라벨 (상하 여백 반영)
+	var blood_counter: Label = Label.new()
+	blood_counter.name = "BloodCounter"
+	blood_counter.add_theme_font_size_override("font_size", 18)
+	blood_counter.add_theme_color_override("font_color",
+		Color(1.0, 0.5, 0.5, 1.0))
+	blood_counter.position = Vector2(1920 / 2 - 60, -82)
+	blood_counter.size = Vector2(120, 44)
+	blood_counter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	blood_counter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_dots_container.add_child(blood_counter)
+
 func _on_slot_gui_input(event: InputEvent, index: int) -> void:
 	if not event is InputEventMouseButton:
 		return
@@ -243,15 +290,30 @@ func _process(delta: float) -> void:
 		_apply_shake(delta)
 		return
 	_elapsed_time += delta
-
-	# 난이도 단계 (30초마다)
+	_remaining_time -= delta
 	var difficulty: int = int(_elapsed_time / 30.0)
 	spawn_interval = max(1.5, 4.0 - difficulty * 0.35)
 	max_entities = min(10, 4 + difficulty)
 	if ResourceManager:
 		ResourceManager.difficulty = difficulty
 
-	_timer_label.text = "%02d:%02d  [D%d]" % [int(_elapsed_time) / 60, int(_elapsed_time) % 60, difficulty]
+	var minutes: int = int(_remaining_time) / 60
+	var seconds: int = int(_remaining_time) % 60
+	_timer_label.text = "%02d:%02d" % [minutes, seconds]
+
+	# 30초 이하 빨갛게 깜빡임
+	if _remaining_time <= 30.0:
+		var blink: float = abs(sin(_elapsed_time * 4.0))
+		_timer_label.add_theme_color_override("font_color",
+			Color(1.0, blink * 0.3, blink * 0.3, 1.0))
+	else:
+		_timer_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+
+	# 시간 종료
+	if _remaining_time <= 0.0:
+		_remaining_time = 0.0
+		_timer_label.text = "00:00"
+		_escape_success()
 
 	_blink_timer += delta
 	if _blink_timer >= 0.8:
@@ -293,6 +355,12 @@ func _process(delta: float) -> void:
 			var dots: Array = _dots_container.get_children()
 			for i in range(dots.size()):
 				var dot: Control = dots[i]
+				if dot.name == "BloodBG" or dot.name == "BloodCounter":
+					dot.modulate = Color(1, 1, 1, 0)
+					var tween: Tween = dot.create_tween()
+					tween.tween_interval(0.1)
+					tween.tween_property(dot, "modulate", Color(1, 1, 1, 1), 0.2)
+					continue
 				dot.position = Vector2(dot.position.x, 70.0)
 				dot.modulate = Color(1, 1, 1, 0)
 
@@ -311,6 +379,11 @@ func _process(delta: float) -> void:
 			var dots: Array = _dots_container.get_children()
 			for i in range(dots.size()):
 				var dot: Control = dots[i]
+				if dot.name == "BloodBG" or dot.name == "BloodCounter":
+					var tween: Tween = dot.create_tween()
+					tween.tween_interval(0.12)
+					tween.tween_property(dot, "modulate", Color(1, 1, 1, 0), 0.22)
+					continue
 				var tween: Tween = dot.create_tween()
 				tween.tween_interval(i * 0.05)
 				tween.tween_property(dot, "position:y", 70.0, 0.25
@@ -323,6 +396,11 @@ func _process(delta: float) -> void:
 					_hint_area.visible = false
 					_hint_hiding = false
 			)
+
+	# 재화 표시 업데이트
+	var blood_counter = _dots_container.get_node_or_null("BloodCounter")
+	if blood_counter and _hint_area.visible:
+		blood_counter.text = "🩸 %d" % ResourceManager.blood
 
 	var hovered_node = _get_hovered_game_node()
 	if hovered_node:
@@ -592,6 +670,63 @@ void fragment() {
 	label3.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7, 1.0))
 	label3.position = coffin_center + Vector2(-60, 60)
 	$CanvasLayer.add_child(label3)
+
+func _escape_success() -> void:
+	_is_game_over = true
+	get_tree().paused = true
+
+	var overlay: ColorRect = ColorRect.new()
+	overlay.color = Color(0.0, 0.0, 0.05, 0.0)
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.set_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	$CanvasLayer.add_child(overlay)
+
+	var tween: Tween = create_tween()
+	tween.tween_property(overlay, "color", Color(0.0, 0.0, 0.05, 0.85), 1.2)
+	await tween.finished
+
+	var label1: Label = Label.new()
+	label1.text = "탈출 성공"
+	label1.add_theme_font_size_override("font_size", 28)
+	label1.add_theme_color_override("font_color", Color(0.7, 0.7, 1.0, 1.0))
+	label1.set_anchors_preset(Control.PRESET_CENTER)
+	label1.offset_top = -80
+	label1.offset_left = -100
+	$CanvasLayer.add_child(label1)
+
+	await get_tree().create_timer(0.8).timeout
+
+	var label2: Label = Label.new()
+	label2.text = "획득 재화: 🩸 %d" % ResourceManager.blood
+	label2.add_theme_font_size_override("font_size", 24)
+	label2.add_theme_color_override("font_color", Color(1.0, 0.8, 0.8, 1.0))
+	label2.set_anchors_preset(Control.PRESET_CENTER)
+	label2.offset_top = -30
+	label2.offset_left = -120
+	$CanvasLayer.add_child(label2)
+
+	await get_tree().create_timer(0.8).timeout
+
+	var label3: Label = Label.new()
+	label3.text = "생존 시간: %d초" % int(_elapsed_time)
+	label3.add_theme_font_size_override("font_size", 20)
+	label3.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 1.0))
+	label3.set_anchors_preset(Control.PRESET_CENTER)
+	label3.offset_top = 10
+	label3.offset_left = -100
+	$CanvasLayer.add_child(label3)
+
+	await get_tree().create_timer(1.0).timeout
+
+	var label4: Label = Label.new()
+	label4.text = "[ R ] 다시 도전"
+	label4.add_theme_font_size_override("font_size", 18)
+	label4.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6, 1.0))
+	label4.set_anchors_preset(Control.PRESET_CENTER)
+	label4.offset_top = 60
+	label4.offset_left = -80
+	$CanvasLayer.add_child(label4)
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed:
