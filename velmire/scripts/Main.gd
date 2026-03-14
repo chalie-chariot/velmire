@@ -35,6 +35,7 @@ var _blink_state: bool = true
 var _is_game_over: bool = false
 var _shake_intensity: float = 0.0
 var _shake_duration: float = 0.0
+var _shake_offset: Vector2 = Vector2.ZERO
 var _vignette_tween: Tween
 var _node_slots: Array = [
 	{"id": "absorb", "type": "흡혈", "color": Color(0.9, 0.1, 0.1), "cost": 10},
@@ -64,7 +65,7 @@ func _ready() -> void:
 	add_to_group("main")
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	print("Main 시작")
-	var coffin_center: Vector2 = _coffin_rect.global_position + _coffin_rect.size / 2
+	var coffin_center: Vector2 = _coffin_rect.position + _coffin_rect.size / 2
 	$EntityLayer/HeartPulse.setup(coffin_center)
 	var coffin_particles: Node2D = Node2D.new()
 	coffin_particles.set_script(preload("res://scripts/CoffinParticles.gd"))
@@ -72,8 +73,6 @@ func _ready() -> void:
 	$EntityLayer.add_child(coffin_particles)
 	$CanvasLayer/LeftPanel.modulate = Color(1, 1, 1, 0)
 	$CanvasLayer/RightPanel.modulate = Color(1, 1, 1, 0)
-	$CanvasLayer/LeftPanel.position = Vector2(-220, $CanvasLayer/LeftPanel.position.y)
-	$CanvasLayer/RightPanel.position = Vector2(1920, $CanvasLayer/RightPanel.position.y)
 	$CanvasLayer/LeftTab.gui_input.connect(_on_left_tab_gui_input)
 	$CanvasLayer/RightTab.gui_input.connect(_on_right_tab_gui_input)
 	$CanvasLayer/CoffinHPBar.modulate = Color(1, 1, 1, 0)
@@ -119,9 +118,10 @@ func _spawn_start_nodes() -> void:
 		node.node_id = data.id
 		node.node_type = data.type
 		node.node_color = data.color
-		# 관 좌우에 배치
+		# 관 좌우에 배치 (화면 정중앙과 동일한 수직선)
+		var coffin_center: Vector2 = _coffin_rect.position + _coffin_rect.size / 2
 		var offset_x: float = -120.0 if i == 0 else 120.0
-		var pos: Vector2 = Vector2(960 + offset_x, 600)
+		var pos: Vector2 = Vector2(coffin_center.x + offset_x, coffin_center.y)
 		node.global_position = pos
 		node._slot_position = pos
 		# 그리드에 등록 + is_placed 설정 (SHIFT 시너지 연결 가능)
@@ -345,7 +345,7 @@ func _spawn_blood_entity() -> void:
 		entity = blood_entity_scene.instantiate()
 
 	entity.add_to_group("blood_entities")
-	var coffin_center: Vector2 = _coffin_rect.global_position + _coffin_rect.size / 2
+	var coffin_center: Vector2 = _coffin_rect.position + _coffin_rect.size / 2
 
 	var side: int = randi() % 4
 	var pos: Vector2
@@ -372,7 +372,7 @@ func _spawn_blood_entity() -> void:
 	$EntityLayer.add_child(entity)
 
 func _check_coffin_collision() -> void:
-	var coffin_rect: Rect2 = Rect2(_coffin_rect.global_position, _coffin_rect.size)
+	var coffin_rect: Rect2 = Rect2(_coffin_rect.position, _coffin_rect.size)
 	for entity in get_tree().get_nodes_in_group("blood_entities"):
 		var r: float = entity.radius if "radius" in entity else 30.0
 		var expanded: Rect2 = Rect2(
@@ -407,24 +407,27 @@ func _show_hp_bar() -> void:
 	if _damage_tween:
 		_damage_tween.kill()
 	_damage_tween = create_tween()
+	_damage_tween.tween_interval(0.25)
 	_damage_tween.tween_property(
-		damage_bar, "offset_right", 1200.0 * ratio, 0.6
+		damage_bar, "offset_right", 1200.0 * ratio, 0.85
 	).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUART)
 
 	label.text = "HP %d / %d" % [int(coffin_hp), int(coffin_max_hp)]
 
 	_fade_hp_bar(true)
 	_hp_visible = true
-	_hp_hide_timer = 1.0
+	_hp_hide_timer = 2.8
 
 func _apply_shake(delta: float) -> void:
 	if _shake_duration > 0:
 		_shake_duration -= delta
-		$EntityLayer.position = Vector2(
+		_shake_offset = Vector2(
 			randf_range(-_shake_intensity, _shake_intensity),
 			randf_range(-_shake_intensity, _shake_intensity)
 		)
+		$EntityLayer.position = _shake_offset
 	else:
+		_shake_offset = Vector2.ZERO
 		$EntityLayer.position = Vector2.ZERO
 
 func _trigger_shake() -> void:
@@ -440,7 +443,7 @@ func _trigger_vignette() -> void:
 	_vignette_tween.tween_property(_vignette, "modulate", Color(1, 1, 1, 0), 0.4).set_ease(Tween.EASE_IN)
 
 func _trigger_shockwave(hit_pos: Vector2) -> void:
-	var coffin_center: Vector2 = _coffin_rect.global_position + _coffin_rect.size / 2
+	var coffin_center: Vector2 = _coffin_rect.position + _coffin_rect.size / 2
 
 	for i in range(12):
 		var shard: Node2D = Node2D.new()
@@ -523,7 +526,7 @@ void fragment() {
 		0.0, 1.0, 1.5
 	).set_ease(Tween.EASE_OUT)
 
-	var coffin_center: Vector2 = _coffin_rect.global_position + _coffin_rect.size / 2
+	var coffin_center: Vector2 = _coffin_rect.position + _coffin_rect.size / 2
 
 	var label1: Label = Label.new()
 	label1.text = "...아직은 아니야"
