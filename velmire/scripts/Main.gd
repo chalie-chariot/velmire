@@ -43,6 +43,7 @@ var _node_slots: Array = [
 	{"id": "resonate", "type": "증폭", "color": Color(0.1, 0.8, 0.2), "cost": 20},
 ]
 var _hint_hiding: bool = false
+var _hint_hide_tweens: Array = []
 
 # ===== 난이도 단계 (30초마다 증가) =====
 # 단계 0~3   혈체(血體)   기본 핏덩어리
@@ -245,15 +246,17 @@ func _on_slot_gui_input(event: InputEvent, index: int) -> void:
 
 	# 재화 확인
 	if ResourceManager.blood < data.cost:
-		# 재화 부족 - 슬롯 흔들기
+		# 재화 부족 - 슬롯 흔들기 (폭 줄이고 횟수 늘려서 빠르게)
 		var slot = _dots_container.get_child(index)
+		var ox: float = slot.position.x
 		var tween: Tween = create_tween()
-		tween.tween_property(slot, "position:x",
-			slot.position.x + 8, 0.05)
-		tween.tween_property(slot, "position:x",
-			slot.position.x - 8, 0.05)
-		tween.tween_property(slot, "position:x",
-			slot.position.x, 0.05)
+		tween.tween_property(slot, "position:x", ox + 3, 0.03)
+		tween.tween_property(slot, "position:x", ox - 3, 0.03)
+		tween.tween_property(slot, "position:x", ox + 3, 0.03)
+		tween.tween_property(slot, "position:x", ox - 3, 0.03)
+		tween.tween_property(slot, "position:x", ox + 3, 0.03)
+		tween.tween_property(slot, "position:x", ox - 3, 0.03)
+		tween.tween_property(slot, "position:x", ox, 0.03)
 		return
 
 	# 재화 차감
@@ -342,8 +345,22 @@ func _process(delta: float) -> void:
 
 	var my: float = get_viewport().get_mouse_position().y
 	if my > 820:
-		_hint_hiding = false
-		if not _hint_area.visible:
+		# 숨기기 진행 중에 마우스 다시 내리면 즉시 취소 후 표시
+		if _hint_hiding:
+			_hint_hiding = false
+			for t in _hint_hide_tweens:
+				if t and is_instance_valid(t):
+					t.kill()
+			_hint_hide_tweens.clear()
+			var dots: Array = _dots_container.get_children()
+			for dot in dots:
+				if dot.name == "BloodBG" or dot.name == "BloodCounter":
+					dot.modulate = Color(1, 1, 1, 1)
+				else:
+					dot.position = Vector2(dot.position.x, 30.0)
+					dot.modulate = Color(1, 1, 1, 1)
+			_hint_area.position = Vector2(_hint_area.position.x, 950.0)
+		elif not _hint_area.visible:
 			_hint_area.visible = true
 			_hint_area.modulate = Color(1, 1, 1, 1)
 			_hint_area.position = Vector2(_hint_area.position.x, 1020.0)
@@ -372,7 +389,9 @@ func _process(delta: float) -> void:
 	else:
 		if _hint_area.visible and not _hint_hiding:
 			_hint_hiding = true
+			_hint_hide_tweens.clear()
 			var area_tween: Tween = _hint_area.create_tween()
+			_hint_hide_tweens.append(area_tween)
 			area_tween.tween_property(_hint_area, "position:y", 1020.0, 0.25
 			).set_ease(Tween.EASE_IN)
 
@@ -381,10 +400,12 @@ func _process(delta: float) -> void:
 				var dot: Control = dots[i]
 				if dot.name == "BloodBG" or dot.name == "BloodCounter":
 					var tween: Tween = dot.create_tween()
+					_hint_hide_tweens.append(tween)
 					tween.tween_interval(0.12)
 					tween.tween_property(dot, "modulate", Color(1, 1, 1, 0), 0.22)
 					continue
 				var tween: Tween = dot.create_tween()
+				_hint_hide_tweens.append(tween)
 				tween.tween_interval(i * 0.05)
 				tween.tween_property(dot, "position:y", 70.0, 0.25
 				).set_ease(Tween.EASE_IN)
@@ -395,6 +416,7 @@ func _process(delta: float) -> void:
 				if _hint_hiding:
 					_hint_area.visible = false
 					_hint_hiding = false
+					_hint_hide_tweens.clear()
 			)
 
 	# 재화 표시 업데이트
