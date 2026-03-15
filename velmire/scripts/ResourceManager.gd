@@ -14,6 +14,25 @@ var total_runs: int = 0
 var total_kills: int = 0
 var best_viewers: int = 0
 
+var ruby: int = 0  # 블러디아 루비
+
+
+func add_ruby(amount: int) -> void:
+	ruby += amount
+	var main = get_tree().get_first_node_in_group("main")
+	if main and main.has_method("update_ruby_ui"):
+		main.update_ruby_ui(ruby)
+
+
+func spend_ruby(amount: int) -> bool:
+	if ruby < amount:
+		return false
+	ruby -= amount
+	var main = get_tree().get_first_node_in_group("main")
+	if main and main.has_method("update_ruby_ui"):
+		main.update_ruby_ui(ruby)
+	return true
+
 
 func _ready() -> void:
 	print("ResourceManager 시작")

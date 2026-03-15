@@ -1,6 +1,11 @@
 extends Node
 class_name SynergyEngine
 
+var _popup_bg: ColorRect = null
+var _popup_label1: Label = null
+var _popup_label2: Label = null
+var _popup_tween: Tween = null
+
 func _ready() -> void:
 	add_to_group("synergy_engine")
 
@@ -61,16 +66,29 @@ func _show_synergy_popup(node: Node, text: String) -> void:
 		var cm = main._get_chat_manager()
 		if cm:
 			cm.send_chat("synergy")
-	# 화면 상단 중앙에 박스형 팝업
 
-	# 배경 박스 (텍스트 상하 여백 확보, 전체적으로 아래로)
+	# 기존 팝업 있으면 텍스트만 업데이트 + 타이머 리셋
+	if is_instance_valid(_popup_bg) and is_instance_valid(_popup_label1) and is_instance_valid(_popup_label2):
+		_popup_bg.modulate = Color(1, 1, 1, 1)  # 투명도 초기화
+		var lines: PackedStringArray = text.split("\n", false)
+		_popup_label1.text = "⚡ SYNERGY  " + (lines[0] if lines.size() > 0 else "")
+		_popup_label2.text = lines[1] if lines.size() > 1 else ""
+		if _popup_tween:
+			_popup_tween.kill()
+		_popup_tween = _popup_bg.create_tween()
+		_popup_tween.tween_interval(1.5)
+		_popup_tween.tween_property(_popup_bg, "modulate:a", 0.0, 0.4)
+		_popup_tween.tween_callback(_popup_cleanup)
+		return
+
+	# 새 팝업 생성
 	var bg: ColorRect = ColorRect.new()
 	bg.color = Color(0.05, 0.0, 0.0, 0.0)
-	bg.size = Vector2(400, 96)
-	bg.position = Vector2(760, 75)  # TopBar 아래, 여유 있게
+	bg.size = Vector2(400, 110)
+	bg.position = Vector2(760, 75)
 	main.get_node("CanvasLayer").add_child(bg)
+	_popup_bg = bg
 
-	# 테두리 (상하 여백)
 	var border: ColorRect = ColorRect.new()
 	border.color = Color(1.0, 0.8, 0.1, 0.9)
 	border.size = Vector2(400, 2)
@@ -80,29 +98,49 @@ func _show_synergy_popup(node: Node, text: String) -> void:
 	var border2: ColorRect = ColorRect.new()
 	border2.color = Color(1.0, 0.8, 0.1, 0.9)
 	border2.size = Vector2(400, 2)
-	border2.position = Vector2(0, 94)
+	border2.position = Vector2(0, 108)
 	bg.add_child(border2)
 
-	# 텍스트 (위 18px, 아래 28px 여백)
-	var label: Label = Label.new()
-	label.text = "⚡ SYNERGY  " + text
-	label.add_theme_font_size_override("font_size", 26)
-	label.add_theme_color_override("font_color",
-		Color(1.0, 0.9, 0.2, 1.0))
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.size = Vector2(400, 50)
-	label.position = Vector2(0, 18)
-	bg.add_child(label)
+	var lines: PackedStringArray = text.split("\n", false)
+	var line1: String = "⚡ SYNERGY  " + (lines[0] if lines.size() > 0 else "")
+	var line2: String = lines[1] if lines.size() > 1 else ""
 
-	# 아래에서 위로 슬라이드 + 페이드인 → 유지 → 페이드아웃
+	var label1: Label = Label.new()
+	label1.text = line1
+	label1.add_theme_font_size_override("font_size", 24)
+	label1.add_theme_color_override("font_color", Color(1.0, 0.9, 0.2, 1.0))
+	label1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label1.size = Vector2(400, 32)
+	label1.position = Vector2(0, 20)
+	bg.add_child(label1)
+	_popup_label1 = label1
+
+	var label2: Label = Label.new()
+	label2.text = line2
+	label2.add_theme_font_size_override("font_size", 22)
+	label2.add_theme_color_override("font_color", Color(1.0, 0.85, 0.15, 1.0))
+	label2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label2.size = Vector2(400, 32)
+	label2.position = Vector2(0, 54)
+	bg.add_child(label2)
+	_popup_label2 = label2
+
 	bg.modulate.a = 0.0
 	bg.position.y = 110.0
 
-	var tween: Tween = bg.create_tween()
-	tween.tween_property(bg, "modulate:a", 1.0, 0.2)
-	tween.parallel().tween_property(bg, "position:y", 75.0, 0.2) \
+	_popup_tween = bg.create_tween()
+	_popup_tween.tween_property(bg, "modulate:a", 1.0, 0.2)
+	_popup_tween.parallel().tween_property(bg, "position:y", 75.0, 0.2) \
 		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUART)
-	tween.tween_interval(1.5)
-	tween.tween_property(bg, "modulate:a", 0.0, 0.4)
-	tween.tween_callback(bg.queue_free)
+	_popup_tween.tween_interval(1.5)
+	_popup_tween.tween_property(bg, "modulate:a", 0.0, 0.4)
+	_popup_tween.tween_callback(_popup_cleanup)
+
+
+func _popup_cleanup() -> void:
+	if is_instance_valid(_popup_bg):
+		_popup_bg.queue_free()
+	_popup_bg = null
+	_popup_label1 = null
+	_popup_label2 = null
+	_popup_tween = null

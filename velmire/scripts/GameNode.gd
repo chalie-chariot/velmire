@@ -10,6 +10,7 @@ const CONNECT_RANGE := 400.0  # 시너지 연결 가능 거리
 var radius: float = 28.0
 var is_dragging: bool = false
 var is_placed: bool = false
+var is_in_indicator: bool = false  # 인디케이터 슬롯에 등록된 상태
 var is_starter_node: bool = false  # 초기 무료 노드 2개 (취소 환불 제외)
 var grid_col: int = -1
 var grid_row: int = -1
@@ -29,10 +30,19 @@ var is_pending_connection: bool = false
 var _shift_held: bool = false
 var _is_first_selected: bool = false
 var is_selected: bool = false
+var _range_fade_timer: float = -1.0  # > 0 이면 페이드아웃 중 (4번째 선택 시 1번째 해제용)
+var _range_fade_duration: float = 0.35
 var _mouse_down_for_click: bool = false
 var _mouse_down_pos: Vector2 = Vector2.ZERO
 
 const _DRAG_THRESHOLD: float = 10.0
+
+func start_range_fade_out() -> void:
+	_range_fade_timer = _range_fade_duration
+	is_selected = false
+
+func _cancel_range_fade() -> void:
+	_range_fade_timer = -1.0
 
 func _ready() -> void:
 	_generate_base_points()
@@ -62,12 +72,6 @@ func _start_drag() -> void:
 	is_dragging = true
 	_drag_offset = global_position - get_global_mouse_position()
 	_slot_position = global_position
-
-func _deselect_all_others() -> void:
-	var nodes = get_tree().get_nodes_in_group("game_nodes")
-	for n in nodes:
-		if n != self:
-			n.is_selected = false
 
 func _is_topmost_hovered() -> bool:
 	var mouse_pos: Vector2 = get_global_mouse_position()
@@ -122,37 +126,37 @@ func _input(event: InputEvent) -> void:
 							cm.finish_connect(self)
 					get_viewport().set_input_as_handled()
 				elif not Input.is_key_pressed(KEY_SHIFT):
-					if is_selected:
-						# 이미 선택된 노드 재클릭 → 선택 해제
-						var cm_sel = get_tree().get_first_node_in_group("connection_manager")
-						if cm_sel and cm_sel.has_method("clear_selected"):
-							cm_sel.clear_selected()
-						is_selected = false
-					else:
-						# 클릭 vs 드래그 구분: 우선 대기
-						_mouse_down_for_click = true
-						_mouse_down_pos = get_global_mouse_position()
+					# 클릭 vs 드래그 구분: 우선 대기
+					_mouse_down_for_click = true
+					_mouse_down_pos = get_global_mouse_position()
 					get_viewport().set_input_as_handled()
 			else:
-				# 다른 곳 클릭 시 선택 해제
-				var cm_sel = get_tree().get_first_node_in_group("connection_manager")
-				if cm_sel and cm_sel.has_method("clear_selected"):
-					cm_sel.clear_selected()
-				is_selected = false
+				# 다른 곳 클릭 시에만 선택 전부 해제 (어떤 노드 위가 아닐 때만)
+				var any_node_hovered := false
+				for n in get_tree().get_nodes_in_group("game_nodes"):
+					var lp: Vector2 = n.to_local(get_global_mouse_position())
+					if lp.length() <= n.radius + 10.0:
+						any_node_hovered = true
+						break
+				if not any_node_hovered:
+					var main = get_tree().get_first_node_in_group("main")
+					if main and main.has_method("clear_all_node_selection"):
+						main.clear_all_node_selection()
 
 		elif event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
 			if is_dragging:
 				is_dragging = false
 				_try_place_on_grid()
-				is_selected = false  # 드래그로 이동했을 때는 외곽선 숨김
+				var main = get_tree().get_first_node_in_group("main")
+				if main and main.has_method("clear_all_node_selection"):
+					main.clear_all_node_selection()
+				_range_fade_timer = -1.0  # 드래그 시 페이드 취소
 				get_viewport().set_input_as_handled()
 			elif _mouse_down_for_click and is_hover and _is_topmost_hovered():
-				# 클릭만 했을 때 → 선택 (외곽선 표시)
-				_deselect_all_others()
-				is_selected = true
-				var cm_sel = get_tree().get_first_node_in_group("connection_manager")
-				if cm_sel and cm_sel.has_method("set_selected"):
-					cm_sel.set_selected(self)
+				# 클릭만 했을 때 → 다중 선택 (최대 3개)
+				var main = get_tree().get_first_node_in_group("main")
+				if main and main.has_method("register_node_select"):
+					main.register_node_select(self)
 				_mouse_down_for_click = false
 				get_viewport().set_input_as_handled()
 			else:
@@ -162,9 +166,9 @@ func _input(event: InputEvent) -> void:
 		var dist: float = _mouse_down_pos.distance_to(get_global_mouse_position())
 		if dist > _DRAG_THRESHOLD:
 			_mouse_down_for_click = false
-			var cm_motion = get_tree().get_first_node_in_group("connection_manager")
-			if cm_motion and cm_motion.has_method("clear_selected"):
-				cm_motion.clear_selected()
+			var main = get_tree().get_first_node_in_group("main")
+			if main and main.has_method("clear_all_node_selection"):
+				main.clear_all_node_selection()
 			_start_drag()
 			get_viewport().set_input_as_handled()
 
@@ -174,6 +178,10 @@ func _input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
+	if _range_fade_timer > 0:
+		_range_fade_timer -= delta
+		if _range_fade_timer <= 0:
+			_range_fade_timer = -1.0
 	if is_dragging:
 		global_position = get_global_mouse_position() + _drag_offset
 
@@ -253,10 +261,26 @@ func _draw() -> void:
 			Color(node_color.r, node_color.g, node_color.b, 0.5), 2.0)
 
 	# 1. 일반 선택 범위 (클릭 - 시너지 등 적용된 실시간 범위)
-	if is_selected and is_placed:
+	# 3개까지: 즉시 표시 / 4번째 선택 시 1번째는 페이드아웃
+	var show_range: bool = (is_selected and is_placed) or _range_fade_timer > 0
+	if show_range:
 		var range_val: float = _get_ability_range()
+		var alpha: float = 0.8
+		if _range_fade_timer > 0:
+			alpha = 0.8 * (_range_fade_timer / _range_fade_duration)
 		draw_arc(Vector2.ZERO, range_val, 0, TAU, 128,
-			Color(node_color.r, node_color.g, node_color.b, 0.8), 1.5)
+			Color(node_color.r, node_color.g, node_color.b, alpha), 1.5)
+		# 선택 순서 번호 (페이드 중이면 표시 안 함)
+		if is_selected:
+			var main = get_tree().get_first_node_in_group("main")
+			if main:
+				var idx: int = main._selected_nodes.find(self)
+				if idx >= 0:
+					var font: Font = ThemeDB.fallback_font
+					draw_string(font, Vector2(radius + 8, -radius),
+						str(idx + 1),
+						HORIZONTAL_ALIGNMENT_LEFT, -1, 14,
+						Color(node_color.r, node_color.g, node_color.b, 0.9))
 
 	# 2. SHIFT 연결 범위 (_is_first_selected - 400 그라데이션)
 	if _is_first_selected and is_placed:
@@ -347,6 +371,10 @@ func on_right_click() -> void:
 		if ResourceManager:
 			ResourceManager.add_blood(base_cost * 0.5)
 
+	var main = get_tree().get_first_node_in_group("main")
+	if main and main.has_method("register_node_select") and self in main._selected_nodes:
+		main.register_node_select(self)  # 목록에서 제거
+
 	_spawn_burst_effect()
 	queue_free()
 
@@ -394,8 +422,25 @@ func _get_node_info() -> Dictionary:
 	return {name = "", desc = "", synergy1 = "", synergy2 = "", atk = 0, cooldown = 0.0}
 
 func _try_place_on_grid() -> void:
+	var mouse_pos: Vector2 = get_viewport().get_mouse_position()
+
+	# 1순위: 인디케이터 슬롯 위인지 먼저 확인
+	var main = get_tree().get_first_node_in_group("main")
+	if main:
+		var slot_idx: int = main._get_slot_at(mouse_pos)
+		if slot_idx >= 0:
+			main._register_to_slot(slot_idx, self)
+			return  # 그리드 배치 안함
+
+	# 2순위: 마우스가 인디케이터 영역(y > 880)이면 그리드 배치 안함
+	if mouse_pos.y > 880:
+		_return_to_slot()
+		return
+
+	# 3순위: 그리드 배치 시도
 	var grid = get_tree().get_first_node_in_group("heart_pulse")
 	if not grid:
+		_return_to_slot()
 		return
 	var cell: Vector2i = grid.world_to_grid(global_position)
 	if grid.is_valid_cell(cell.x, cell.y) and grid.is_cell_empty(cell.x, cell.y):

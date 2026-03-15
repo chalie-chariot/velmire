@@ -398,7 +398,7 @@ anchors_preset = 0
 offset_left = 10.0
 offset_top = 20.0
 offset_right = 210.0
-offset_bottom = 100.0
+offset_bottom = 120.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_card")
 
 [node name="ResourcesVBox" type="VBoxContainer" parent="CanvasLayer/LeftPanel/Card1_Resources"]
@@ -407,7 +407,7 @@ anchors_preset = 0
 offset_left = 12.0
 offset_top = 12.0
 offset_right = 188.0
-offset_bottom = 88.0
+offset_bottom = 108.0
 theme_override_constants/separation = 8
 
 [node name="BloodRow" type="HBoxContainer" parent="CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox"]
@@ -416,31 +416,48 @@ layout_mode = 2
 [node name="BloodLabel" type="Label" parent="CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/BloodRow"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 13
-text = "🩸 피"
+theme_override_colors/font_color = Color(1, 0.267, 0.267, 1)
+theme_override_font_sizes/font_size = 14
+text = "🩸 혈액"
 
 [node name="BloodValue" type="Label" parent="CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/BloodRow"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 14
 text = "0"
 horizontal_alignment = 2
 
-[node name="SpecialRow" type="HBoxContainer" parent="CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox"]
+[node name="RubyRow" type="HBoxContainer" parent="CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox"]
 layout_mode = 2
 
-[node name="SpecialLabel" type="Label" parent="CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/SpecialRow"]
+[node name="RubyLabel" type="Label" parent="CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/RubyRow"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 13
-text = "💎 특수재화"
+theme_override_colors/font_color = Color(1, 0.133, 0.133, 1)
+theme_override_font_sizes/font_size = 14
+text = "🔴 루비"
 
-[node name="SpecialValue" type="Label" parent="CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/SpecialRow"]
+[node name="RubyValue" type="Label" parent="CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/RubyRow"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 14
+text = "0"
+horizontal_alignment = 2
+
+[node name="ChipRow" type="HBoxContainer" parent="CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox"]
+layout_mode = 2
+
+[node name="ChipLabel" type="Label" parent="CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/ChipRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.533, 0.533, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "💠 블러디아 칩"
+
+[node name="ChipValue" type="Label" parent="CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/ChipRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.533, 0.533, 0.533, 1)
+theme_override_font_sizes/font_size = 14
 text = "0"
 horizontal_alignment = 2
 
@@ -448,7 +465,7 @@ horizontal_alignment = 2
 layout_mode = 1
 anchors_preset = 0
 offset_left = 10.0
-offset_top = 120.0
+offset_top = 130.0
 offset_right = 210.0
 offset_bottom = 210.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_card")
@@ -487,193 +504,22 @@ theme_override_styles/fill = SubResource("StyleBoxFlat_progress_fill")
 max_value = 100.0
 value = 0.0
 
-[node name="Card3_NodeSlots" type="Panel" parent="CanvasLayer/LeftPanel"]
+[node name="OwnedNodesContainer" type="VBoxContainer" parent="CanvasLayer/LeftPanel"]
 layout_mode = 1
 anchors_preset = 0
 offset_left = 10.0
-offset_top = 240.0
+offset_top = 120.0
 offset_right = 210.0
-offset_bottom = 590.0
-theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+offset_bottom = 520.0
+theme_override_constants/separation = 8
 
-[node name="NodeSlotLabel" type="Label" parent="CanvasLayer/LeftPanel/Card3_NodeSlots"]
+[node name="RecalledSlotsHolder" type="Control" parent="CanvasLayer/LeftPanel"]
 layout_mode = 1
 anchors_preset = 0
-offset_left = 12.0
-offset_top = 14.0
-offset_right = 200.0
-offset_bottom = 30.0
-theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
-theme_override_font_sizes/font_size = 13
-text = "보유 노드"
-
-[node name="NodeSlot1" type="Panel" parent="CanvasLayer/LeftPanel/Card3_NodeSlots"]
-layout_mode = 1
-anchors_preset = 0
-offset_left = 12.0
-offset_top = 40.0
-offset_right = 82.0
-offset_bottom = 110.0
-theme_override_styles/panel = SubResource("StyleBoxFlat_node_slot")
-
-[node name="Label" type="Label" parent="CanvasLayer/LeftPanel/Card3_NodeSlots/NodeSlot1"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -9.0
-offset_top = -11.0
-offset_right = 9.0
-offset_bottom = 11.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 18
-text = "?"
-horizontal_alignment = 1
-vertical_alignment = 1
-
-[node name="NodeSlot2" type="Panel" parent="CanvasLayer/LeftPanel/Card3_NodeSlots"]
-layout_mode = 1
-anchors_preset = 0
-offset_left = 94.0
-offset_top = 40.0
-offset_right = 164.0
-offset_bottom = 110.0
-theme_override_styles/panel = SubResource("StyleBoxFlat_node_slot")
-
-[node name="Label" type="Label" parent="CanvasLayer/LeftPanel/Card3_NodeSlots/NodeSlot2"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -9.0
-offset_top = -11.0
-offset_right = 9.0
-offset_bottom = 11.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 18
-text = "?"
-horizontal_alignment = 1
-vertical_alignment = 1
-
-[node name="NodeSlot3" type="Panel" parent="CanvasLayer/LeftPanel/Card3_NodeSlots"]
-layout_mode = 1
-anchors_preset = 0
-offset_left = 12.0
-offset_top = 122.0
-offset_right = 82.0
-offset_bottom = 192.0
-theme_override_styles/panel = SubResource("StyleBoxFlat_node_slot")
-
-[node name="Label" type="Label" parent="CanvasLayer/LeftPanel/Card3_NodeSlots/NodeSlot3"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -9.0
-offset_top = -11.0
-offset_right = 9.0
-offset_bottom = 11.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 18
-text = "?"
-horizontal_alignment = 1
-vertical_alignment = 1
-
-[node name="NodeSlot4" type="Panel" parent="CanvasLayer/LeftPanel/Card3_NodeSlots"]
-layout_mode = 1
-anchors_preset = 0
-offset_left = 94.0
-offset_top = 122.0
-offset_right = 164.0
-offset_bottom = 192.0
-theme_override_styles/panel = SubResource("StyleBoxFlat_node_slot")
-
-[node name="Label" type="Label" parent="CanvasLayer/LeftPanel/Card3_NodeSlots/NodeSlot4"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -9.0
-offset_top = -11.0
-offset_right = 9.0
-offset_bottom = 11.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 18
-text = "?"
-horizontal_alignment = 1
-vertical_alignment = 1
-
-[node name="NodeSlot5" type="Panel" parent="CanvasLayer/LeftPanel/Card3_NodeSlots"]
-layout_mode = 1
-anchors_preset = 0
-offset_left = 12.0
-offset_top = 204.0
-offset_right = 82.0
-offset_bottom = 274.0
-theme_override_styles/panel = SubResource("StyleBoxFlat_node_slot")
-
-[node name="Label" type="Label" parent="CanvasLayer/LeftPanel/Card3_NodeSlots/NodeSlot5"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -9.0
-offset_top = -11.0
-offset_right = 9.0
-offset_bottom = 11.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 18
-text = "?"
-horizontal_alignment = 1
-vertical_alignment = 1
-
-[node name="NodeSlot6" type="Panel" parent="CanvasLayer/LeftPanel/Card3_NodeSlots"]
-layout_mode = 1
-anchors_preset = 0
-offset_left = 94.0
-offset_top = 204.0
-offset_right = 164.0
-offset_bottom = 274.0
-theme_override_styles/panel = SubResource("StyleBoxFlat_node_slot")
-
-[node name="Label" type="Label" parent="CanvasLayer/LeftPanel/Card3_NodeSlots/NodeSlot6"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -9.0
-offset_top = -11.0
-offset_right = 9.0
-offset_bottom = 11.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 18
-text = "?"
-horizontal_alignment = 1
-vertical_alignment = 1
+offset_left = 10.0
+offset_top = 530.0
+offset_right = 210.0
+offset_bottom = 600.0
 
 [node name="Card4_DeckSlots" type="Panel" parent="CanvasLayer/LeftPanel"]
 layout_mode = 1

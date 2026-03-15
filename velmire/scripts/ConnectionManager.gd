@@ -31,6 +31,9 @@ func _input(event: InputEvent) -> void:
 				_pending = null
 			else:
 				_selected = null
+				var main = get_tree().get_first_node_in_group("main")
+				if main and main.has_method("clear_all_node_selection"):
+					main.clear_all_node_selection()
 			queue_redraw()
 		elif event.keycode == KEY_SHIFT:
 			if event.pressed:
@@ -70,6 +73,15 @@ func start_connect(node: Node2D) -> void:
 func finish_connect(node: Node2D) -> void:
 	# B 노드 선택 (두 번째) → 연결
 	if _pending == null or _pending == node:
+		return
+
+	# 동일 타입 노드끼리는 시너지 연결 불가
+	if _pending.node_type == node.node_type:
+		_pending.is_pending_connection = false
+		_pending._is_first_selected = false
+		_clear_highlights()
+		_pending = null
+		queue_redraw()
 		return
 
 	# 이미 연결된 쌍이면 무시
