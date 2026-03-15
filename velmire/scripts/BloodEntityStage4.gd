@@ -274,6 +274,7 @@ func take_damage(amount: float) -> void:
 	if hp <= 0:
 		var main = get_tree().get_first_node_in_group("main")
 		if main:
+			main.trigger_hitstop(0.06)
 			main.on_entity_killed()
 		_spawn_death_effect()
 		_drop_blood()

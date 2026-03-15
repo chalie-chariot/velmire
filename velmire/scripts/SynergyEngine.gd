@@ -54,19 +54,23 @@ func _apply_synergy(a: Node, b: Node) -> void:
 
 
 func _show_synergy_popup(node: Node, text: String) -> void:
-	# 화면 상단 중앙에 박스형 팝업
 	var main = node.get_tree().get_first_node_in_group("main")
 	if not main:
 		return
+	if main.has_method("_get_chat_manager"):
+		var cm = main._get_chat_manager()
+		if cm:
+			cm.send_chat("synergy")
+	# 화면 상단 중앙에 박스형 팝업
 
-	# 배경 박스
+	# 배경 박스 (텍스트 상하 여백 확보, 전체적으로 아래로)
 	var bg: ColorRect = ColorRect.new()
 	bg.color = Color(0.05, 0.0, 0.0, 0.0)
-	bg.size = Vector2(400, 70)
-	bg.position = Vector2(760, 45)  # TopBar(0-40) 바로 아래
+	bg.size = Vector2(400, 96)
+	bg.position = Vector2(760, 75)  # TopBar 아래, 여유 있게
 	main.get_node("CanvasLayer").add_child(bg)
 
-	# 테두리
+	# 테두리 (상하 여백)
 	var border: ColorRect = ColorRect.new()
 	border.color = Color(1.0, 0.8, 0.1, 0.9)
 	border.size = Vector2(400, 2)
@@ -76,10 +80,10 @@ func _show_synergy_popup(node: Node, text: String) -> void:
 	var border2: ColorRect = ColorRect.new()
 	border2.color = Color(1.0, 0.8, 0.1, 0.9)
 	border2.size = Vector2(400, 2)
-	border2.position = Vector2(0, 68)
+	border2.position = Vector2(0, 94)
 	bg.add_child(border2)
 
-	# 텍스트
+	# 텍스트 (위 18px, 아래 28px 여백)
 	var label: Label = Label.new()
 	label.text = "⚡ SYNERGY  " + text
 	label.add_theme_font_size_override("font_size", 26)
@@ -87,17 +91,17 @@ func _show_synergy_popup(node: Node, text: String) -> void:
 		Color(1.0, 0.9, 0.2, 1.0))
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.size = Vector2(400, 70)
-	label.position = Vector2(0, 0)
+	label.size = Vector2(400, 50)
+	label.position = Vector2(0, 18)
 	bg.add_child(label)
 
 	# 아래에서 위로 슬라이드 + 페이드인 → 유지 → 페이드아웃
 	bg.modulate.a = 0.0
-	bg.position.y = 80.0
+	bg.position.y = 110.0
 
 	var tween: Tween = bg.create_tween()
 	tween.tween_property(bg, "modulate:a", 1.0, 0.2)
-	tween.parallel().tween_property(bg, "position:y", 45.0, 0.2) \
+	tween.parallel().tween_property(bg, "position:y", 75.0, 0.2) \
 		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUART)
 	tween.tween_interval(1.5)
 	tween.tween_property(bg, "modulate:a", 0.0, 0.4)

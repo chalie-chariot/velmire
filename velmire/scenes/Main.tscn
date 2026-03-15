@@ -929,9 +929,45 @@ offset_top = 40.0
 offset_right = 280.0
 offset_bottom = 710.0
 
-[node name="ChatLog" type="VBoxContainer" parent="CanvasLayer/RightPanel/ChatBox/ScrollContainer"]
+[node name="ChatLog" type="RichTextLabel" parent="CanvasLayer/RightPanel/ChatBox/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_vertical = 3
+bbcode_enabled = true
+fit_content = true
+theme_override_colors/default_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/normal_font_size = 17
+
+[node name="ViewerBar" type="ColorRect" parent="CanvasLayer/RightPanel"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 720.0
+offset_right = 280.0
+offset_bottom = 760.0
+color = Color(0.0392157, 0, 0, 0.9)
+
+[node name="ViewerLabel" type="Label" parent="CanvasLayer/RightPanel/ViewerBar"]
+layout_mode = 0
+anchors_preset = 0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 130.0
+offset_bottom = 30.0
+theme_override_colors/font_color = Color(0.666667, 0.666667, 0.666667, 1)
+theme_override_font_sizes/font_size = 14
+text = "👁 0"
+
+[node name="LikeLabel" type="Label" parent="CanvasLayer/RightPanel/ViewerBar"]
+layout_mode = 0
+anchors_preset = 0
+offset_left = 140.0
+offset_top = 10.0
+offset_right = 270.0
+offset_bottom = 30.0
+theme_override_colors/font_color = Color(1, 0.419608, 0.419608, 1)
+theme_override_font_sizes/font_size = 14
+text = "❤ 0"
 
 [node name="HintArea" type="Control" parent="CanvasLayer"]
 layout_mode = 0

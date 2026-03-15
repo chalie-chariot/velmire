@@ -17,10 +17,14 @@ extends Node2D
 @onready var _hint_label: Label = $CanvasLayer/HintPopup/HintLabel
 @onready var _hint_area: Control = $CanvasLayer/HintArea
 @onready var _dots_container: Control = $CanvasLayer/HintArea/DotsContainer
+@onready var _viewer_label: Label = $CanvasLayer/RightPanel/ViewerBar/ViewerLabel
+@onready var _like_label: Label = $CanvasLayer/RightPanel/ViewerBar/LikeLabel
 var _left_tween: Tween
 var _right_tween: Tween
 var _hp_tween: Tween
 var _damage_tween: Tween
+var _coffin_push_tween: Tween
+const _coffin_base_pos: Vector2 = Vector2(920.0, 480.0)
 var _left_open: bool = false
 var _right_open: bool = false
 var spawn_timer: float = 0.0
@@ -55,6 +59,7 @@ var _pending_spawn_index: int = -1  # 재화 차감됐지만 아직 스폰 안�
 var _combo_count: int = 0
 var _combo_timer: float = 0.0
 var _combo_duration: float = 3.0  # 3초 안에 다음 처치 없으면 콤보 리셋
+var _hitstop_timer: float = 0.0
 
 # ===== 난이도 단계 (30초마다 증가) =====
 # 단계 0~3   혈체(血體)   기본 핏덩어리
@@ -72,8 +77,17 @@ var _combo_duration: float = 3.0  # 3초 안에 다음 처치 없으면 콤보 �
 # 단계 5 (150s+):   스폰간격 2.25s / 최대 9개 / HP 160 / 속도 80 / radius 37
 # ==========================================
 var _elapsed_time: float = 0.0
-var _round_time: float = 30.0  # 테스트용 30초 (원래 120초)
-var _remaining_time: float = 30.0
+var _round_time: float = 120.0  # 테스트용 2분
+var _remaining_time: float = 120.0
+var _viewers: int = 0
+var _likes: int = 0
+var _viewer_timer: float = 0.0
+var _like_timer: float = 0.0
+var _prev_difficulty: int = 0
+var _danger_chat_sent: bool = false
+var _kill_count: int = 0
+var _ai_chat_started: bool = false
+var _state_timer: float = 0.0
 
 func _ready() -> void:
 	add_to_group("main")
@@ -94,6 +108,11 @@ func _ready() -> void:
 	_spawn_start_nodes()
 	var synergy_engine = SynergyEngine.new()
 	add_child(synergy_engine)
+	var chat_manager = ChatManager.new()
+	add_child(chat_manager)
+	var chat_log: RichTextLabel = $CanvasLayer/RightPanel/ChatBox/ScrollContainer/ChatLog as RichTextLabel
+	chat_manager.setup(chat_log)
+	chat_manager.send_chat("start")
 	_build_hint_dots()
 	$CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/SpecialRow.modulate = Color(1, 1, 1, 0.5)
 	ResourceManager.blood_changed.connect(_on_blood_changed)
@@ -102,6 +121,10 @@ func _ready() -> void:
 	_on_blood_changed(ResourceManager.blood)
 	update_blood_ui(ResourceManager.blood)
 	_on_special_changed(ResourceManager.special)
+	_init_viewers()
+	var viewer_bar: Control = $CanvasLayer/RightPanel/ViewerBar
+	var right_panel: Control = $CanvasLayer/RightPanel
+	viewer_bar.position = Vector2(0, right_panel.size.y - 40)
 
 func show_tooltip(info: Dictionary, node_color: Color) -> void:
 	_tip_name.text = info.name
@@ -423,6 +446,46 @@ func _unlock_next_slot() -> void:
 	await get_tree().create_timer(3.0).timeout
 	_unlock_animation_playing = false
 
+func _get_chat_manager() -> Node:
+	return get_tree().get_first_node_in_group("chat_manager")
+
+func _has_synergy_connection() -> bool:
+	var cm = get_tree().get_first_node_in_group("connection_manager")
+	if cm:
+		return cm._connections.size() > 0
+	return false
+
+func _init_viewers() -> void:
+	var base: int = 50 + ResourceManager.total_runs * 30
+	_viewers = randi_range(base, base + 50)
+	var like_base: int = 10 + ResourceManager.total_runs * 10
+	_likes = randi_range(like_base, like_base + 20)
+	var cm = _get_chat_manager()
+	if cm and cm.has_method("set_idle_interval_range"):
+		if _viewers < 100:
+			cm.set_idle_interval_range(4.0, 7.0)
+		elif _viewers < 300:
+			cm.set_idle_interval_range(2.5, 5.0)
+		else:
+			cm.set_idle_interval_range(1.5, 3.0)
+	_update_viewer_ui()
+
+func _update_viewer_ui() -> void:
+	if _viewers > ResourceManager.best_viewers:
+		ResourceManager.best_viewers = _viewers
+	if _viewer_label:
+		_viewer_label.text = "👁 %d" % _viewers
+	if _like_label:
+		_like_label.text = "❤ %d" % _likes
+
+func on_difficulty_up() -> void:
+	_viewers += randi_range(20, 80)
+	_likes += randi_range(5, 20)
+	_update_viewer_ui()
+	var cm = _get_chat_manager()
+	if cm:
+		cm.send_chat("danger")
+
 func _get_hovered_game_node():
 	for n in get_tree().get_nodes_in_group("game_nodes"):
 		if n.is_hovered:
@@ -432,6 +495,17 @@ func _get_hovered_game_node():
 func on_entity_killed() -> void:
 	_combo_count += 1
 	_combo_timer = _combo_duration
+	_kill_count += 1
+
+	var cm = _get_chat_manager()
+	if cm:
+		if _combo_count >= 3:
+			cm.send_chat("combo")
+		elif _combo_count >= 1:
+			cm.send_chat("kill")
+	if _combo_count >= 3:
+		_likes += randi_range(3, 10)
+		_update_viewer_ui()
 
 	# 콤보 배수 계산
 	var multiplier: float = 1.0
@@ -447,6 +521,9 @@ func on_entity_killed() -> void:
 func reset_combo() -> void:
 	_combo_count = 0
 	_combo_timer = 0.0
+
+func trigger_hitstop(duration: float = 0.06) -> void:
+	_hitstop_timer = duration
 
 func _show_combo_popup(count: int, multiplier: float) -> void:
 	var label: Label = Label.new()
@@ -471,6 +548,13 @@ func _show_combo_popup(count: int, multiplier: float) -> void:
 	tween.tween_callback(label.queue_free)
 
 func _process(delta: float) -> void:
+	if _hitstop_timer > 0:
+		_hitstop_timer -= delta / Engine.time_scale  # 실제 시간 기준 감소
+		Engine.time_scale = 0.05
+		return
+	else:
+		Engine.time_scale = 1.0
+
 	if _is_game_over:
 		_apply_shake(delta)
 		return
@@ -485,6 +569,52 @@ func _process(delta: float) -> void:
 	max_entities = min(10, 4 + difficulty)
 	if ResourceManager:
 		ResourceManager.difficulty = difficulty
+	if difficulty != _prev_difficulty:
+		_prev_difficulty = difficulty
+		on_difficulty_up()
+
+	_viewer_timer += delta
+	_like_timer += delta
+	if _viewer_timer >= 5.0:
+		_viewer_timer = 0.0
+		var change: int = randi_range(-5, 15)
+		_viewers = max(1, _viewers + change)
+		_update_viewer_ui()
+	if _like_timer >= 8.0:
+		_like_timer = 0.0
+		var like_change: int = randi_range(0, 5)
+		_likes += like_change
+		_update_viewer_ui()
+
+	var hp_ratio: float = coffin_hp / coffin_max_hp
+	if hp_ratio <= 0.1 and not _danger_chat_sent:
+		_danger_chat_sent = true
+		var cm = _get_chat_manager()
+		if cm:
+			cm.send_chat("danger")
+	elif hp_ratio > 0.1:
+		_danger_chat_sent = false
+
+	if _elapsed_time >= 20.0 and not _ai_chat_started:
+		_ai_chat_started = true
+		var cm = _get_chat_manager()
+		if cm:
+			cm._ai_chat_enabled = true
+
+	_state_timer += delta
+	if _state_timer >= 2.0:
+		_state_timer = 0.0
+		var cm = _get_chat_manager()
+		if cm:
+			cm.update_game_state({
+				"hp_ratio": coffin_hp / coffin_max_hp,
+				"difficulty": difficulty,
+				"blood": ResourceManager.blood,
+				"placed_nodes": get_tree().get_nodes_in_group("game_nodes").size(),
+				"connected": _has_synergy_connection(),
+				"combo": _combo_count,
+				"time_left": _remaining_time
+			})
 
 	var minutes: int = int(_remaining_time) / 60
 	var seconds: int = int(_remaining_time) % 60
@@ -522,6 +652,7 @@ func _process(delta: float) -> void:
 			_spawn_blood_entity()
 
 	_check_coffin_collision()
+	_update_coffin_visual()
 
 	if _hp_visible:
 		_hp_hide_timer -= delta
@@ -658,6 +789,24 @@ func _spawn_blood_entity() -> void:
 
 	$EntityLayer.add_child(entity)
 
+func _update_coffin_visual() -> void:
+	var ratio: float = coffin_hp / coffin_max_hp
+
+	if ratio > 0.7:
+		_coffin_rect.color = Color(1.0, 1.0, 1.0, 1.0)
+	elif ratio > 0.4:
+		_coffin_rect.color = Color(1.0, 0.7, 0.7, 1.0)
+	elif ratio > 0.1:
+		# 위급 - 빨강 + 점멸
+		var pulse: float = (sin(_elapsed_time * 12.0) + 1.0) * 0.5
+		var bright: float = lerp(0.4, 1.0, pulse)
+		_coffin_rect.color = Color(1.0, 0.3 * bright, 0.3 * bright, 1.0)
+	else:
+		# 사망 직전 - 강한 빨강 + 빠른 점멸
+		var pulse2: float = (sin(_elapsed_time * 20.0) + 1.0) * 0.5
+		var bright2: float = lerp(0.3, 1.0, pulse2)
+		_coffin_rect.color = Color(1.0, 0.1 * bright2, 0.1 * bright2, 1.0)
+
 func _check_coffin_collision() -> void:
 	var coffin_rect: Rect2 = Rect2(_coffin_rect.position, _coffin_rect.size)
 	for entity in get_tree().get_nodes_in_group("blood_entities"):
@@ -667,14 +816,23 @@ func _check_coffin_collision() -> void:
 			coffin_rect.size + Vector2(r * 2, r * 2)
 		)
 		if expanded.has_point(entity.global_position):
+			var hit_pos: Vector2 = entity.global_position
 			entity.remove_from_group("blood_entities")
 			entity.queue_free()
 			coffin_hp -= 10.0
 			coffin_hp = max(coffin_hp, 0.0)
 			reset_combo()
+			trigger_hitstop(0.1)  # 관 타격 시 더 강한 히트스탑
+			var cm = _get_chat_manager()
+			if cm:
+				cm.send_chat("hit")
+			_viewers += randi_range(1, 8)
+			_likes += randi_range(0, 3)
+			_update_viewer_ui()
 			_trigger_shake()
 			_trigger_vignette()
-			_trigger_shockwave(entity.global_position)
+			_trigger_shockwave(hit_pos)
+			_trigger_coffin_push(hit_pos)
 			_show_hp_bar()
 			if coffin_hp <= 0.0:
 				_game_over()
@@ -751,6 +909,20 @@ func heal_coffin(amount: float) -> void:
 	tween.tween_property(_coffin_rect, "scale", Vector2(1.15, 1.15), 0.1).set_ease(Tween.EASE_OUT)
 	tween.tween_property(_coffin_rect, "scale", Vector2(1.0, 1.0), 0.2).set_ease(Tween.EASE_IN)
 
+func _trigger_coffin_push(hit_pos: Vector2) -> void:
+	var coffin_center: Vector2 = _coffin_rect.global_position + _coffin_rect.size / 2
+	var push_dir: Vector2 = (coffin_center - hit_pos).normalized()
+	if push_dir.is_zero_approx():
+		push_dir = Vector2.RIGHT
+	var push_amount: float = 14.0
+	var pushed_pos: Vector2 = _coffin_base_pos + push_dir * push_amount
+
+	if _coffin_push_tween:
+		_coffin_push_tween.kill()
+	_coffin_push_tween = create_tween()
+	_coffin_push_tween.tween_property(_coffin_rect, "position", pushed_pos, 0.04).set_ease(Tween.EASE_OUT)
+	_coffin_push_tween.tween_property(_coffin_rect, "position", _coffin_base_pos, 0.18).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+
 func _trigger_shake() -> void:
 	var hp_ratio: float = coffin_hp / coffin_max_hp
 	_shake_intensity = lerp(4.0, 12.0, 1.0 - hp_ratio)
@@ -803,7 +975,11 @@ func _fade_hp_bar(show: bool) -> void:
 	).set_ease(Tween.EASE_OUT)
 
 func _game_over() -> void:
+	Engine.time_scale = 1.0
 	_is_game_over = true
+	var cm = _get_chat_manager()
+	if cm:
+		cm.send_chat("gameover")
 	_live_dot.modulate.a = 1.0
 	_live_dot.add_theme_color_override("font_color", Color(0.8, 0.0, 0.0, 1.0))
 	get_tree().paused = true
@@ -881,7 +1057,14 @@ void fragment() {
 	$CanvasLayer.add_child(label3)
 
 func _escape_success() -> void:
+	Engine.time_scale = 1.0
 	_is_game_over = true
+	var cm = _get_chat_manager()
+	if cm:
+		cm.send_chat("clear")
+	_viewers += randi_range(100, 300)
+	_likes += randi_range(50, 150)
+	_update_viewer_ui()
 	get_tree().paused = true
 
 	var overlay: ColorRect = ColorRect.new()
@@ -973,6 +1156,9 @@ func _input(event: InputEvent) -> void:
 			_right_open = !_right_open
 
 		if event.keycode == KEY_R and _is_game_over:
+			ResourceManager.total_runs += 1
+			ResourceManager.total_kills += _kill_count
+			Engine.time_scale = 1.0
 			get_tree().paused = false
 			get_tree().reload_current_scene()
 

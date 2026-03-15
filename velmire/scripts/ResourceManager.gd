@@ -9,6 +9,11 @@ var special: float = 0.0
 var node_fragments: int = 0
 var difficulty: int = 0  # 0단계부터 시작
 
+# 누적 데이터 (Autoload라 reload_current_scene() 해도 유지됨)
+var total_runs: int = 0
+var total_kills: int = 0
+var best_viewers: int = 0
+
 
 func _ready() -> void:
 	print("ResourceManager 시작")
