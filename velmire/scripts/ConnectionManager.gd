@@ -84,12 +84,32 @@ func finish_connect(node: Node2D) -> void:
 			return
 
 	_connections.append({from = _pending, to = node})
+	var from_node: Node2D = _pending
 	_pending.is_pending_connection = false
 	_pending._is_first_selected = false
 	_clear_highlights()
 	_pending = null
+
+	# 연결 이펙트
+	_spawn_connect_effect(from_node, node)
+	if from_node.has_method("trigger_connect_pulse"):
+		from_node.trigger_connect_pulse()
+	if node.has_method("trigger_connect_pulse"):
+		node.trigger_connect_pulse()
+
 	_notify_synergy_engine()
 	queue_redraw()
+
+func _spawn_connect_effect(from_node: Node2D, to_node: Node2D) -> void:
+	var effect = Node2D.new()
+	effect.set_script(preload("res://scripts/SynergyConnectEffect.gd"))
+	from_node.get_parent().add_child(effect)
+	effect.setup(
+		from_node.global_position,
+		to_node.global_position,
+		from_node.node_color,
+		to_node.node_color
+	)
 
 func disconnect_from(node: Node2D) -> void:
 	# A 노드 우클릭 시 해당 노드의 모든 연결 해제
@@ -224,18 +244,31 @@ func _draw() -> void:
 					conn.to.node_color.b * brightness, 0.9)
 			draw_line(all_pts[i], all_pts[i+1], c, 4.0)
 
-		# 중간점
+		# 중간점 (시너지 컬러 블렌드)
 		var mid_wave: Vector2 = all_pts[mid_idx]
-		draw_circle(mid_wave, 5.0, Color(1.0, 1.0, 1.0, 0.8))
-		draw_circle(mid_wave, 3.0, Color(1.0, 1.0, 1.0, 1.0))
+		var mid_color: Color = Color(
+			(conn.from.node_color.r + conn.to.node_color.r) / 2.0,
+			(conn.from.node_color.g + conn.to.node_color.g) / 2.0,
+			(conn.from.node_color.b + conn.to.node_color.b) / 2.0, 0.9)
+		draw_circle(mid_wave, 5.0, Color(mid_color.r, mid_color.g, mid_color.b, 0.8))
+		draw_circle(mid_wave, 3.0, mid_color)
 
-		# 시너지 발동 시 연결선 번쩍
+		# 시너지 발동 시 연결선 번쩍 (시너지 컬러)
 		if _synergy_flashing:
 			var flash: float = 1.0 - (_synergy_flash_time / 0.4)
-			draw_line(a, b,
-				Color(1.0, 1.0, 1.0, flash * 0.6), 8.0)
+			for i in range(all_pts.size() - 1):
+				var t: float = float(i) / all_pts.size()
+				var c: Color
+				if i < mid_idx:
+					c = Color(conn.from.node_color.r, conn.from.node_color.g,
+						conn.from.node_color.b, flash * 0.6)
+				else:
+					c = Color(conn.to.node_color.r, conn.to.node_color.g,
+						conn.to.node_color.b, flash * 0.6)
+				draw_line(all_pts[i], all_pts[i+1], c, 8.0)
 
 	if _pending:
 		var a: Vector2 = to_local(_pending.global_position)
 		var b: Vector2 = to_local(get_global_mouse_position())
-		draw_line(a, b, Color(1.0, 1.0, 1.0, 0.3), 2.0)
+		var pc: Color = _pending.node_color
+		draw_line(a, b, Color(pc.r, pc.g, pc.b, 0.4), 2.0)

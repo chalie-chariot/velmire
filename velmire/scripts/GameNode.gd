@@ -350,6 +350,11 @@ func on_right_click() -> void:
 	_spawn_burst_effect()
 	queue_free()
 
+func trigger_connect_pulse() -> void:
+	var tween: Tween = create_tween()
+	tween.tween_property(self, "scale", Vector2(1.3, 1.3), 0.1).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "scale", Vector2(1.0, 1.0), 0.2).set_ease(Tween.EASE_IN_OUT)
+
 func _spawn_burst_effect() -> void:
 	var effect = Node2D.new()
 	effect.set_script(preload("res://scripts/NodeBurstEffect.gd"))

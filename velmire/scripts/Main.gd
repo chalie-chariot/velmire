@@ -52,6 +52,9 @@ var _hint_hiding: bool = false
 var _hint_hide_tweens: Array = []
 var _unlock_animation_playing: bool = false  # 해금 애니 중엔 인디케이터 숨기지 않음
 var _pending_spawn_index: int = -1  # 재화 차감됐지만 아직 스폰 안된 슬롯 (중복 방지)
+var _combo_count: int = 0
+var _combo_timer: float = 0.0
+var _combo_duration: float = 3.0  # 3초 안에 다음 처치 없으면 콤보 리셋
 
 # ===== 난이도 단계 (30초마다 증가) =====
 # 단계 0~3   혈체(血體)   기본 핏덩어리
@@ -426,10 +429,55 @@ func _get_hovered_game_node():
 			return n
 	return null
 
+func on_entity_killed() -> void:
+	_combo_count += 1
+	_combo_timer = _combo_duration
+
+	# 콤보 배수 계산
+	var multiplier: float = 1.0
+	if _combo_count >= 5:
+		multiplier = 2.0
+	elif _combo_count >= 3:
+		multiplier = 1.5
+
+	# 콤보 텍스트 표시
+	if _combo_count >= 3:
+		_show_combo_popup(_combo_count, multiplier)
+
+func reset_combo() -> void:
+	_combo_count = 0
+	_combo_timer = 0.0
+
+func _show_combo_popup(count: int, multiplier: float) -> void:
+	var label: Label = Label.new()
+	if count >= 5:
+		label.text = "%d KILL  x%.0f 재화!" % [count, multiplier]
+		label.add_theme_color_override("font_color", Color(1.0, 0.5, 0.0, 1.0))
+		label.add_theme_font_size_override("font_size", 28)
+	else:
+		label.text = "%d KILL  x%.1f" % [count, multiplier]
+		label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.2, 1.0))
+		label.add_theme_font_size_override("font_size", 22)
+
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.size = Vector2(300, 50)
+	label.position = Vector2(810, 210)  # 시너지 팝업(50-120) 아래에 배치
+	$CanvasLayer.add_child(label)
+
+	var tween: Tween = label.create_tween()
+	tween.tween_property(label, "position:y", 190.0, 0.2).set_ease(Tween.EASE_OUT)
+	tween.tween_interval(0.8)
+	tween.tween_property(label, "modulate:a", 0.0, 0.3)
+	tween.tween_callback(label.queue_free)
+
 func _process(delta: float) -> void:
 	if _is_game_over:
 		_apply_shake(delta)
 		return
+	if _combo_count > 0:
+		_combo_timer -= delta
+		if _combo_timer <= 0:
+			_combo_count = 0
 	_elapsed_time += delta
 	_remaining_time -= delta
 	var difficulty: int = int(_elapsed_time / 30.0)
@@ -623,6 +671,7 @@ func _check_coffin_collision() -> void:
 			entity.queue_free()
 			coffin_hp -= 10.0
 			coffin_hp = max(coffin_hp, 0.0)
+			reset_combo()
 			_trigger_shake()
 			_trigger_vignette()
 			_trigger_shockwave(entity.global_position)

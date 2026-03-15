@@ -105,6 +105,9 @@ func take_damage(amount: float) -> void:
 		tween.tween_interval(0.6)
 		tween.tween_property(self, "_damage_bar_ratio", hp / max_hp, 0.4).set_ease(Tween.EASE_OUT)
 	if hp <= 0:
+		var main = get_tree().get_first_node_in_group("main")
+		if main:
+			main.on_entity_killed()
 		_spawn_death_effect()
 		_drop_blood()
 		remove_from_group("blood_entities")
