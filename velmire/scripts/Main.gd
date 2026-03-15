@@ -68,6 +68,7 @@ var _unlock_animation_playing: bool = false  # 해금 애니 중엔 인디케이
 var _indicator_was_hidden: bool = true
 var _pending_spawn_index: int = -1  # 재화 차감됐지만 아직 스폰 안된 슬롯 (중복 방지)
 var _slots_in_panel: bool = false  # X키로 슬롯이 Q 패널로 회수된 상태
+var _debug_slot_pos_printed: bool = false  # P키 디버그 1프레임만
 var _slot_data: Array[String] = ["", "", "", "", "", ""]  # 6개 인디케이터 슬롯
 var _selected_nodes: Array = []
 var _combo_count: int = 0
@@ -108,6 +109,7 @@ var _perfect_defense_notified: bool = false
 func _ready() -> void:
 	add_to_group("main")
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_unlocked_slots = 6  # 테스트: 슬롯 전체 해금
 	print("Main 시작")
 	var coffin_center: Vector2 = _coffin_rect.position + _coffin_rect.size / 2
 	$EntityLayer/HeartPulse.setup(coffin_center)
@@ -264,7 +266,7 @@ func _on_slot_clicked(event: InputEvent, index: int) -> void:
 		return
 	for d in _owned_nodes:
 		if d["id"] == node_id:
-			_spawn_node_to_field(d)
+			_spawn_node_to_field(d, false)  # spend_on_drop=false (이미 소유)
 			_slot_data[index] = ""
 			_update_slot_visual(index)
 			break
@@ -446,17 +448,29 @@ func _build_owned_nodes() -> void:
 
 	$CanvasLayer/LeftPanel/Card4_DeckSlots.hide()
 
-func _spawn_node_to_field(data: Dictionary) -> void:
+func _get_node_cost(data: Dictionary) -> int:
+	if data.has("cost"):
+		return data["cost"]
+	match data.get("id", ""):
+		"absorb": return 10
+		"freeze": return 15
+		"resonate": return 20
+	return 0
+
+func _spawn_node_to_field(data: Dictionary, spend_on_drop: bool = false) -> Node2D:
 	var node_scene = preload("res://scenes/GameNode.tscn")
 	var node = node_scene.instantiate()
 	node.node_id = data.id
 	node.node_type = data.type
 	node.node_color = data.color
+	node.spawn_cost = _get_node_cost(data) if spend_on_drop else 0
 	node.global_position = get_viewport().get_mouse_position()
 	node._slot_position = get_viewport().get_mouse_position()
 	node.is_dragging = true
 	node._drag_offset = Vector2.ZERO
+	node._drag_start_pos = get_viewport().get_mouse_position()
 	$EntityLayer.add_child(node)
+	return node
 
 func _on_owned_node_input(event: InputEvent, data: Dictionary) -> void:
 	if not event is InputEventMouseButton:
@@ -464,12 +478,7 @@ func _on_owned_node_input(event: InputEvent, data: Dictionary) -> void:
 	if event.button_index != MOUSE_BUTTON_LEFT or not event.pressed:
 		return
 
-	var cost: int = 10
-	match data.id:
-		"absorb": cost = 10
-		"freeze": cost = 15
-		"resonate": cost = 20
-
+	var cost: int = _get_node_cost(data)
 	if ResourceManager.blood < cost:
 		_show_deny_popup("혈액 부족! 🩸%d 필요" % cost)
 		return
@@ -487,10 +496,7 @@ func _on_owned_node_input(event: InputEvent, data: Dictionary) -> void:
 		_show_deny_popup("슬롯이 꽉 찼어요! 🔓 슬롯 해금 필요")
 		return
 
-	if not ResourceManager.spend_blood(cost):
-		return
-
-	_spawn_node_to_field(data)
+	_spawn_node_to_field(data, true)  # spend_on_drop=true
 
 func register_node_select(node: Node2D) -> void:
 	if node in _selected_nodes:
@@ -608,11 +614,8 @@ func _on_slot_gui_input(event: InputEvent, index: int) -> void:
 		_show_deny_popup("슬롯이 꽉 찼어요! 🔓 슬롯 해금 필요")
 		return
 
-	# 재화 차감 (1번만)
 	_pending_spawn_index = index
-	ResourceManager.spend_blood(data.cost)
-
-	_spawn_node_to_field(data)
+	_spawn_node_to_field(data, true)  # spend_on_drop=true
 	call_deferred("_clear_pending_spawn")  # 프레임 끝에 초기화 (중복 이벤트 방지)
 	get_viewport().set_input_as_handled()
 
@@ -816,6 +819,19 @@ func _show_combo_popup(count: int, multiplier: float) -> void:
 	tween.tween_callback(label.queue_free)
 
 func _process(delta: float) -> void:
+	if Input.is_key_pressed(KEY_P):
+		if not _debug_slot_pos_printed:
+			_debug_slot_pos_printed = true
+			print("_dots_container position:", _dots_container.position)
+			print("슬롯0 global_position:", _dots_container.get_children()[0].global_position)
+			for child in _dots_container.get_children():
+				if child is Panel:
+					print("슬롯 position:", child.position)
+					print("슬롯 부모 position:", _dots_container.position)
+					print("_hint_area position:", _hint_area.position)
+	else:
+		_debug_slot_pos_printed = false
+
 	if _hitstop_timer > 0:
 		_hitstop_timer -= delta / Engine.time_scale  # 실제 시간 기준 감소
 		Engine.time_scale = 0.05
@@ -1494,6 +1510,7 @@ func _input(event: InputEvent) -> void:
 			_recall_slots_to_panel()
 
 func _recall_slots_to_panel() -> void:
+	print("회수 시점 _hint_area.position:", _hint_area.position)
 	if _slots_in_panel:
 		_show_deny_popup("이미 회수했습니다 [X]")
 		return
@@ -1502,6 +1519,9 @@ func _recall_slots_to_panel() -> void:
 	for i in range(_slot_data.size()):
 		if _slot_data[i] != "":
 			recalled_count += 1
+			var idx = i
+			var delay = idx * 0.08
+			get_tree().create_timer(delay).timeout.connect(func(): _fire_slot_wave(idx))
 		_slot_data[i] = ""
 		_update_slot_visual(i)
 
@@ -1518,6 +1538,61 @@ func _recall_slots_to_panel() -> void:
 	_hint_hiding = false
 	_hint_area.visible = false  # 완전히 숨긴 상태로 리셋
 	_indicator_was_hidden = true  # 다시 올라올 수 있게
+	_slots_in_panel = false  # 인디케이터 다시 올라올 수 있게 리셋
+
+func _fire_slot_wave(index: int) -> void:
+	var slots = _dots_container.get_children()
+	if index >= slots.size():
+		return
+	var slot = slots[index]
+
+	var effect = Node2D.new()
+	$EntityLayer.add_child(effect)
+	effect.position = Vector2(slot.global_position.x + 32, 980)
+
+	# 중앙 플래시: 순간 번쩍
+	var flash = Panel.new()
+	flash.size = Vector2(48, 48)
+	flash.position = Vector2(-24, -24)
+	flash.pivot_offset = Vector2(24, 24)
+	var flash_style = StyleBoxFlat.new()
+	flash_style.set_corner_radius_all(24)
+	flash_style.bg_color = Color(1.0, 0.9, 0.5, 0.8)
+	flash_style.set_border_width_all(0)
+	flash.add_theme_stylebox_override("panel", flash_style)
+	effect.add_child(flash)
+	var flash_tw = create_tween()
+	flash_tw.tween_property(flash, "scale", Vector2(1.2, 1.2), 0.08).set_ease(Tween.EASE_OUT)
+	flash_tw.parallel().tween_property(flash, "modulate:a", 0.0, 0.12).set_ease(Tween.EASE_IN)
+
+	# 3겹 리플: 순차 확장 + 페이드
+	for j in range(3):
+		var ring = Panel.new()
+		ring.size = Vector2(64, 64)
+		ring.position = Vector2(-32, -32)
+		ring.pivot_offset = Vector2(32, 32)
+		ring.modulate.a = 0.0
+		var ring_style = StyleBoxFlat.new()
+		ring_style.set_corner_radius_all(32)
+		var alpha_inner = 0.25 - j * 0.06
+		var alpha_border = 0.7 - j * 0.15
+		ring_style.bg_color = Color(1.0, 0.4, 0.2, alpha_inner)
+		ring_style.border_color = Color(1.0, 0.5, 0.3, alpha_border)
+		ring_style.set_border_width_all(6)
+		ring.add_theme_stylebox_override("panel", ring_style)
+		effect.add_child(ring)
+
+		var tw = create_tween()
+		tw.tween_interval(j * 0.06)
+		tw.tween_property(ring, "modulate:a", 1.0, 0.02)
+		tw.tween_property(ring, "scale", Vector2(2.8, 2.8), 0.4)\
+			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+		tw.parallel().tween_property(ring, "modulate:a", 0.0, 0.35)\
+			.set_delay(0.08).set_ease(Tween.EASE_IN)
+
+	get_tree().create_timer(0.65).timeout.connect(
+		func(): if is_instance_valid(effect): effect.queue_free()
+	)
 
 func _on_left_tab_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:

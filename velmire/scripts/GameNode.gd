@@ -35,8 +35,11 @@ var _range_fade_duration: float = 0.35
 var _mouse_down_for_click: bool = false
 var _mouse_down_pos: Vector2 = Vector2.ZERO
 var is_preview: bool = false
+var spawn_cost: int = 0  # 드롭 시 재화 소모 (0이면 이미 소유)
 
 const _DRAG_THRESHOLD: float = 10.0
+var _drag_start_pos: Vector2 = Vector2.ZERO
+const DRAG_MIN_DIST: float = 10.0
 
 func start_range_fade_out() -> void:
 	_range_fade_timer = _range_fade_duration
@@ -72,6 +75,7 @@ func _start_drag() -> void:
 		grid_col = -1
 		grid_row = -1
 	is_dragging = true
+	_drag_start_pos = get_viewport().get_mouse_position()
 	_drag_offset = global_position - get_global_mouse_position()
 	_slot_position = global_position
 
@@ -150,6 +154,10 @@ func _input(event: InputEvent) -> void:
 		elif event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
 			if is_dragging:
 				is_dragging = false
+				var drag_dist = get_viewport().get_mouse_position().distance_to(_drag_start_pos)
+				if drag_dist < DRAG_MIN_DIST:
+					queue_free()
+					return
 				_try_place_on_grid()
 				var main = get_tree().get_first_node_in_group("main")
 				if main and main.has_method("clear_all_node_selection"):
@@ -455,6 +463,9 @@ func _try_place_on_grid() -> void:
 		is_placed = true
 		grid_col = cell.x
 		grid_row = cell.y
+		if spawn_cost > 0 and ResourceManager:
+			ResourceManager.spend_blood(spawn_cost)
+			spawn_cost = 0
 		var cm = get_tree().get_first_node_in_group("connection_manager")
 		if cm and cm.has_method("set_last_placed"):
 			cm.set_last_placed(self)
