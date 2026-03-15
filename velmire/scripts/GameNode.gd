@@ -34,6 +34,7 @@ var _range_fade_timer: float = -1.0  # > 0 이면 페이드아웃 중 (4번째 �
 var _range_fade_duration: float = 0.35
 var _mouse_down_for_click: bool = false
 var _mouse_down_pos: Vector2 = Vector2.ZERO
+var is_preview: bool = false
 
 const _DRAG_THRESHOLD: float = 10.0
 
@@ -47,7 +48,8 @@ func _cancel_range_fade() -> void:
 func _ready() -> void:
 	_generate_base_points()
 	_phase_offset = randf_range(0.0, TAU)
-	add_to_group("game_nodes")
+	if not is_preview:
+		add_to_group("game_nodes")
 	if node_type == "흡혈":
 		attack_cooldown = 2.0
 
@@ -95,6 +97,8 @@ func _is_topmost_hovered() -> bool:
 	return true
 
 func _input(event: InputEvent) -> void:
+	if is_preview:
+		return
 	if event is InputEventMouseButton:
 		var local_pos = to_local(get_global_mouse_position())
 		var is_hover: bool = local_pos.length() <= radius + 10.0

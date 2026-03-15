@@ -508,12 +508,13 @@ value = 0.0
 layout_mode = 1
 anchors_preset = 0
 offset_left = 10.0
-offset_top = 120.0
+offset_top = 620.0
 offset_right = 210.0
-offset_bottom = 520.0
+offset_bottom = 1020.0
 theme_override_constants/separation = 8
 
 [node name="RecalledSlotsHolder" type="Control" parent="CanvasLayer/LeftPanel"]
+visible = false
 layout_mode = 1
 anchors_preset = 0
 offset_left = 10.0

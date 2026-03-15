@@ -65,9 +65,10 @@ var _slot_unlock_cost: int = 30  # 슬롯 해금 비용
 var _hint_hiding: bool = false
 var _hint_hide_tweens: Array = []
 var _unlock_animation_playing: bool = false  # 해금 애니 중엔 인디케이터 숨기지 않음
+var _indicator_was_hidden: bool = true
 var _pending_spawn_index: int = -1  # 재화 차감됐지만 아직 스폰 안된 슬롯 (중복 방지)
 var _slots_in_panel: bool = false  # X키로 슬롯이 Q 패널로 회수된 상태
-var _slot_data: Array = [null, null, null, null, null, null]  # 6개 인디케이터 슬롯
+var _slot_data: Array[String] = ["", "", "", "", "", ""]  # 6개 인디케이터 슬롯
 var _selected_nodes: Array = []
 var _combo_count: int = 0
 var _combo_timer: float = 0.0
@@ -233,8 +234,8 @@ func _build_hint_dots() -> void:
 	_dots_container.add_child(blood_counter)
 
 	for i in range(6):
-		if i < _slot_data.size() and _slot_data[i] and is_instance_valid(_slot_data[i]):
-			_update_slot_visual(i, _slot_data[i])
+		if i < _slot_data.size():
+			_update_slot_visual(i)
 
 	_setup_slot_inputs()
 
@@ -246,22 +247,27 @@ func _setup_slot_inputs() -> void:
 			continue
 		slot.mouse_filter = Control.MOUSE_FILTER_STOP
 		var idx: int = i
-		slot.gui_input.connect(func(ev): _on_indicator_slot_input(ev, idx))
+		slot.gui_input.connect(func(ev): _on_slot_clicked(ev, idx))
 
-func _on_indicator_slot_input(event: InputEvent, index: int) -> void:
+func _on_slot_clicked(event: InputEvent, index: int) -> void:
 	if not event is InputEventMouseButton:
 		return
 	if event.button_index != MOUSE_BUTTON_LEFT or not event.pressed:
 		return
-	var node = _slot_data[index] if index < _slot_data.size() else null
-	if node and is_instance_valid(node):
-		node.visible = true
-		node.is_in_indicator = false
-		node.global_position = get_viewport().get_mouse_position()
-		node._drag_offset = Vector2.ZERO
-		node.is_dragging = true
-		_slot_data[index] = null
-		_update_slot_visual(index, null)
+	var node_id = _slot_data[index] if index < _slot_data.size() else ""
+	if node_id == "":
+		return
+	var total_nodes: int = get_tree().get_nodes_in_group("game_nodes").size()
+	if total_nodes >= _unlocked_slots:
+		_shake_slot(index)
+		_show_deny_popup("슬롯이 꽉 찼어요! 🔓 슬롯 해금 필요")
+		return
+	for d in _owned_nodes:
+		if d["id"] == node_id:
+			_spawn_node_to_field(d)
+			_slot_data[index] = ""
+			_update_slot_visual(index)
+			break
 
 func _highlight_slot(index: int, on: bool) -> void:
 	var slots = _dots_container.get_children()
@@ -276,16 +282,19 @@ func _highlight_slot(index: int, on: bool) -> void:
 		style.bg_color = Color(0.3, 0.1, 0.1, 0.9)
 		style.border_color = Color(1.0, 0.3, 0.3, 1.0)
 	else:
-		var node = _slot_data[index] if index < _slot_data.size() else null
-		if node and is_instance_valid(node):
+		var node_id = _slot_data[index] if index < _slot_data.size() else ""
+		var node_data = null
+		if node_id != "":
+			for d in _owned_nodes:
+				if d["id"] == node_id:
+					node_data = d
+					break
+		if node_data:
 			style.bg_color = Color(
-				node.node_color.r * 0.2,
-				node.node_color.g * 0.2,
-				node.node_color.b * 0.2, 0.9)
-			style.border_color = Color(
-				node.node_color.r,
-				node.node_color.g,
-				node.node_color.b, 0.8)
+				node_data["color"].r * 0.2,
+				node_data["color"].g * 0.2,
+				node_data["color"].b * 0.2, 0.9)
+			style.border_color = node_data["color"]
 		else:
 			style.bg_color = Color(0.05, 0.0, 0.0, 0.7)
 			style.border_color = Color(0.4, 0.1, 0.1, 0.6)
@@ -308,77 +317,83 @@ func _get_slot_at(pos: Vector2) -> int:
 
 func _register_to_slot(index: int, node: Node2D) -> void:
 	for i in range(_slot_data.size()):
-		if _slot_data[i] == node:
-			_slot_data[i] = null
-			_update_slot_visual(i, null)
+		if _slot_data[i] == node.node_id:
+			_slot_data[i] = ""
+			_update_slot_visual(i)
+	_slot_data[index] = node.node_id
+	_update_slot_visual(index)
+	# 필드에서 노드 제거 (데이터는 _owned_nodes에 보관)
+	var node_data = {"id": node.node_id, "type": node.node_type, "color": node.node_color}
+	var exists = false
+	for d in _owned_nodes:
+		if d["id"] == node.node_id:
+			exists = true
+			break
+	if not exists:
+		_owned_nodes.append(node_data)
+	node.queue_free()
 
-	_slot_data[index] = node
-	_update_slot_visual(index, node)
-
-	var slots = _dots_container.get_children()
-	if index < slots.size():
-		var slot = slots[index]
-		if slot is Control:
-			node.global_position = slot.global_position + Vector2(32, 32)
-			node._slot_position = node.global_position
-	node.is_placed = false
-	node.is_in_indicator = true
-	node.visible = false  # 필드에서 안보이게 숨김
-	node.is_selected = false
-
-func _update_slot_visual(index: int, node: Node2D) -> void:
+func _update_slot_visual(index: int) -> void:
 	var slots = _dots_container.get_children()
 	if index >= slots.size():
 		return
 	var slot = slots[index]
 	if not slot is Panel:
 		return
-
 	for child in slot.get_children():
-		child.queue_free()
-
-	var style: StyleBoxFlat = StyleBoxFlat.new()
+		slot.remove_child(child)
+		child.free()
+	var style = StyleBoxFlat.new()
 	style.set_corner_radius_all(32)
-
-	if node and is_instance_valid(node):
-		style.bg_color = Color(
-			node.node_color.r * 0.2,
-			node.node_color.g * 0.2,
-			node.node_color.b * 0.2, 0.9)
-		style.border_color = Color(
-			node.node_color.r,
-			node.node_color.g,
-			node.node_color.b, 0.8)
-
-		var label: Label = Label.new()
-		label.text = node.node_type
-		label.add_theme_font_size_override("font_size", 11)
-		label.add_theme_color_override("font_color",
-			Color(1.0, 1.0, 1.0, 0.9))
-		label.size = Vector2(64, 64)
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		slot.add_child(label)
-	else:
-		style.bg_color = Color(0.05, 0.0, 0.0, 0.7)
-		style.border_color = Color(0.4, 0.1, 0.1, 0.6)
-
 	style.border_width_left = 2
 	style.border_width_right = 2
 	style.border_width_top = 2
 	style.border_width_bottom = 2
+	var node_id = _slot_data[index]
+	var node_data = null
+	if node_id != "":
+		for d in _owned_nodes:
+			if d["id"] == node_id:
+				node_data = d
+				break
+	if node_data:
+		style.bg_color = Color(
+			node_data["color"].r * 0.15,
+			node_data["color"].g * 0.15,
+			node_data["color"].b * 0.15, 0.9)
+		style.border_color = node_data["color"]
+		slot.add_theme_stylebox_override("panel", style)
+		slot.clip_contents = true
+
+		var node_scene = preload("res://scenes/GameNode.tscn")
+		var preview = node_scene.instantiate()
+		preview.node_id = node_data["id"]
+		preview.node_type = node_data["type"]
+		preview.node_color = node_data["color"]
+		preview.scale = Vector2(0.55, 0.55)
+		preview.position = Vector2(32, 32)
+		preview.set_process(false)
+		preview.set_physics_process(false)
+		preview.set_process_input(false)
+		preview.is_preview = true
+		slot.add_child(preview)
+	else:
+		style.bg_color = Color(0.05, 0.0, 0.0, 0.7)
+		style.border_color = Color(0.4, 0.1, 0.1, 0.6)
 	slot.add_theme_stylebox_override("panel", style)
 
 func _build_owned_nodes() -> void:
+	# 1. 기존 자식 전부 제거
 	for child in _owned_container.get_children():
 		child.queue_free()
+	# 2. 한 프레임 대기 (queue_free 완료)
 	await get_tree().process_frame
 
+	# 3. _owned_nodes 루프 (흡혈/결계/증폭 버튼)
 	for data in _owned_nodes:
 		var row: Button = Button.new()
 		row.custom_minimum_size = Vector2(190, 52)
 		row.text = ""
-
 		var style: StyleBoxFlat = StyleBoxFlat.new()
 		style.bg_color = Color(
 			data.color.r * 0.2,
@@ -392,7 +407,6 @@ func _build_owned_nodes() -> void:
 		style.border_width_top = 2
 		style.border_width_bottom = 2
 		row.add_theme_stylebox_override("normal", style)
-
 		var name_label: Label = Label.new()
 		name_label.text = data.type
 		name_label.add_theme_font_size_override("font_size", 15)
@@ -400,7 +414,6 @@ func _build_owned_nodes() -> void:
 			Color(1.0, 1.0, 1.0, 0.9))
 		name_label.position = Vector2(12, 8)
 		row.add_child(name_label)
-
 		var cost_label: Label = Label.new()
 		match data.id:
 			"absorb": cost_label.text = "🩸 10"
@@ -412,9 +425,38 @@ func _build_owned_nodes() -> void:
 			Color(1.0, 0.5, 0.5, 0.8))
 		cost_label.position = Vector2(12, 28)
 		row.add_child(cost_label)
-
 		row.gui_input.connect(func(ev): _on_owned_node_input(ev, data))
 		_owned_container.add_child(row)
+
+	# 4. 빈 슬롯 3개
+	for _i in range(3):
+		var empty = Panel.new()
+		empty.custom_minimum_size = Vector2(190, 52)
+		var empty_style = StyleBoxFlat.new()
+		empty_style.bg_color = Color(0.08, 0.0, 0.0)
+		empty_style.border_color = Color(0.4, 0.0, 0.0)
+		empty_style.set_border_width_all(1)
+		empty.add_theme_stylebox_override("panel", empty_style)
+		var empty_label = Label.new()
+		empty_label.text = "비어있음"
+		empty_label.add_theme_color_override("font_color", Color(0.4, 0.0, 0.0))
+		empty_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+		empty.add_child(empty_label)
+		_owned_container.add_child(empty)
+
+	$CanvasLayer/LeftPanel/Card4_DeckSlots.hide()
+
+func _spawn_node_to_field(data: Dictionary) -> void:
+	var node_scene = preload("res://scenes/GameNode.tscn")
+	var node = node_scene.instantiate()
+	node.node_id = data.id
+	node.node_type = data.type
+	node.node_color = data.color
+	node.global_position = get_viewport().get_mouse_position()
+	node._slot_position = get_viewport().get_mouse_position()
+	node.is_dragging = true
+	node._drag_offset = Vector2.ZERO
+	$EntityLayer.add_child(node)
 
 func _on_owned_node_input(event: InputEvent, data: Dictionary) -> void:
 	if not event is InputEventMouseButton:
@@ -448,16 +490,7 @@ func _on_owned_node_input(event: InputEvent, data: Dictionary) -> void:
 	if not ResourceManager.spend_blood(cost):
 		return
 
-	var node_scene = preload("res://scenes/GameNode.tscn")
-	var node = node_scene.instantiate()
-	node.node_id = data.id
-	node.node_type = data.type
-	node.node_color = data.color
-	node.global_position = get_viewport().get_mouse_position()
-	node._slot_position = get_viewport().get_mouse_position()
-	node.is_dragging = true
-	node._drag_offset = Vector2.ZERO
-	$EntityLayer.add_child(node)
+	_spawn_node_to_field(data)
 
 func register_node_select(node: Node2D) -> void:
 	if node in _selected_nodes:
@@ -579,18 +612,7 @@ func _on_slot_gui_input(event: InputEvent, index: int) -> void:
 	_pending_spawn_index = index
 	ResourceManager.spend_blood(data.cost)
 
-	# 노드 스폰 + 드래그 시작
-	var node_scene = preload("res://scenes/GameNode.tscn")
-	var node = node_scene.instantiate()
-	node.node_id = data.id
-	node.node_type = data.type
-	node.node_color = data.color
-	node.global_position = get_viewport().get_mouse_position()
-	node._slot_position = get_viewport().get_mouse_position()
-	node.is_dragging = true
-	node._drag_offset = Vector2.ZERO
-	$EntityLayer.add_child(node)
-
+	_spawn_node_to_field(data)
 	call_deferred("_clear_pending_spawn")  # 프레임 끝에 초기화 (중복 이벤트 방지)
 	get_viewport().set_input_as_handled()
 
@@ -940,12 +962,16 @@ func _process(delta: float) -> void:
 			_hint_area.visible = true
 			_hint_area.modulate = Color(1, 1, 1, 1)
 			_hint_area.position = Vector2(_hint_area.position.x, 1020.0)
+			if _indicator_was_hidden:
+				_indicator_was_hidden = false
+				for i in range(_slot_data.size()):
+					_update_slot_visual(i)
 
 			var area_tween: Tween = _hint_area.create_tween()
 			area_tween.tween_property(_hint_area, "position:y", 950.0, 0.35
 			).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 
-			var dots: Array = _dots_container.get_children()
+			var dots = _dots_container.get_children()
 			for i in range(dots.size()):
 				var dot: Control = dots[i]
 				if dot.name == "BloodBG" or dot.name == "BloodCounter":
@@ -963,6 +989,7 @@ func _process(delta: float) -> void:
 				).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 				tween.parallel().tween_property(dot, "modulate", Color(1, 1, 1, 1), 0.25)
 	else:
+		_indicator_was_hidden = true
 		if not _slots_in_panel and _hint_area.visible and not _hint_hiding and not _unlock_animation_playing:
 			_hint_hiding = true
 			_hint_hide_tweens.clear()
@@ -1468,50 +1495,29 @@ func _input(event: InputEvent) -> void:
 
 func _recall_slots_to_panel() -> void:
 	if _slots_in_panel:
-		_show_deny_popup("이미 Q 패널에 있습니다 [X]")
+		_show_deny_popup("이미 회수했습니다 [X]")
 		return
 
-	var card = $CanvasLayer/LeftPanel.get_node_or_null("RecalledSlotsHolder")
-	if not card:
-		_show_deny_popup("보유 노드 카드 없음")
-		return
+	var recalled_count = 0
+	for i in range(_slot_data.size()):
+		if _slot_data[i] != "":
+			recalled_count += 1
+		_slot_data[i] = ""
+		_update_slot_visual(i)
 
-	# SlotsGrid 컨테이너 준비
-	var grid = card.get_node_or_null("SlotsGrid")
-	if not grid:
-		grid = GridContainer.new()
-		grid.name = "SlotsGrid"
-		grid.columns = 3
-		grid.position = Vector2(12, 40)
-		grid.add_theme_constant_override("h_separation", 10)
-		grid.add_theme_constant_override("v_separation", 10)
-		card.add_child(grid)
+	if recalled_count > 0:
+		_build_owned_nodes()
+		_slots_in_panel = true
+		if not _left_open:
+			_slide_left_open()
+			_left_open = true
+		_show_deny_popup("노드 %d개 회수됨" % recalled_count)
+	else:
+		_show_deny_popup("회수할 노드 없음")
 
-	# _dots_container에서 슬롯만 추출 (BloodBG, BloodCounter 제외)
-	var slot_controls: Array[Control] = []
-	for child in _dots_container.get_children():
-		if child.name == "BloodBG" or child.name == "BloodCounter":
-			continue
-		if child is Control:
-			slot_controls.append(child)
-
-	for i in range(slot_controls.size()):
-		var slot: Control = slot_controls[i]
-		slot.reparent(grid)
-		slot.position = Vector2.ZERO
-		slot.size = Vector2(58, 58)
-		slot.custom_minimum_size = Vector2(58, 58)
-
-	_hint_area.visible = false
 	_hint_hiding = false
-	_hint_hide_tweens.clear()
-	_slots_in_panel = true
-
-	if not _left_open:
-		_slide_left_open()
-		_left_open = true
-
-	_show_deny_popup("슬롯을 Q 패널로 이동 [X]")
+	_hint_area.visible = false  # 완전히 숨긴 상태로 리셋
+	_indicator_was_hidden = true  # 다시 올라올 수 있게
 
 func _on_left_tab_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
