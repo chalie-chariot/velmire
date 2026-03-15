@@ -18,6 +18,10 @@ func check_synergies(connection_manager: Node) -> void:
 
 		_apply_synergy(a, b)
 
+	var cm = get_tree().get_first_node_in_group("connection_manager")
+	if cm:
+		cm.trigger_synergy_flash()
+
 func _clear_all_synergies() -> void:
 	for n in get_tree().get_nodes_in_group("game_nodes"):
 		n.synergy_double_damage = false

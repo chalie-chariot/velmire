@@ -4,11 +4,24 @@ var _connections: Array = []
 var _pending: Node2D = null
 var _selected: Node2D = null  # 일반 클릭으로 선택된 노드 (SHIFT 누르면 범위 표시)
 var _flow_time: float = 0.0
+var _synergy_flash_time: float = 0.0
+var _synergy_flashing: bool = false
 
 func _ready() -> void:
 	add_to_group("connection_manager")
 
 func _input(event: InputEvent) -> void:
+	# 시너지 연결 대기 중 우클릭 → 연결 취소만 (노드 제거 안 함, 이벤트 소비로 Main에서 on_right_click 호출 방지)
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+		if _pending != null:
+			_pending.is_pending_connection = false
+			_pending._is_first_selected = false
+			_clear_highlights()
+			_pending = null
+			queue_redraw()
+			get_viewport().set_input_as_handled()
+		return
+
 	if event is InputEventKey:
 		if event.keycode == KEY_ESCAPE and event.pressed:
 			if _pending:
@@ -134,9 +147,17 @@ func _notify_synergy_engine() -> void:
 	if se and se.has_method("check_synergies"):
 		se.check_synergies(self)
 
+func trigger_synergy_flash() -> void:
+	_synergy_flash_time = 0.0
+	_synergy_flashing = true
+
 func _process(delta: float) -> void:
 	_flow_time += delta
-	if not _connections.is_empty() or _pending:
+	if _synergy_flashing:
+		_synergy_flash_time += delta
+		if _synergy_flash_time > 0.4:
+			_synergy_flashing = false
+	if _synergy_flashing or not _connections.is_empty() or _pending:
 		queue_redraw()
 
 func _draw() -> void:
@@ -207,6 +228,12 @@ func _draw() -> void:
 		var mid_wave: Vector2 = all_pts[mid_idx]
 		draw_circle(mid_wave, 5.0, Color(1.0, 1.0, 1.0, 0.8))
 		draw_circle(mid_wave, 3.0, Color(1.0, 1.0, 1.0, 1.0))
+
+		# 시너지 발동 시 연결선 번쩍
+		if _synergy_flashing:
+			var flash: float = 1.0 - (_synergy_flash_time / 0.4)
+			draw_line(a, b,
+				Color(1.0, 1.0, 1.0, flash * 0.6), 8.0)
 
 	if _pending:
 		var a: Vector2 = to_local(_pending.global_position)

@@ -41,9 +41,17 @@ var _node_slots: Array = [
 	{"id": "absorb", "type": "흡혈", "color": Color(0.9, 0.1, 0.1), "cost": 10},
 	{"id": "freeze", "type": "결계", "color": Color(0.1, 0.3, 0.9), "cost": 15},
 	{"id": "resonate", "type": "증폭", "color": Color(0.1, 0.8, 0.2), "cost": 20},
+	{"id": "absorb", "type": "흡혈", "color": Color(0.9, 0.1, 0.1), "cost": 12},
+	{"id": "freeze", "type": "결계", "color": Color(0.1, 0.3, 0.9), "cost": 18},
+	{"id": "resonate", "type": "증폭", "color": Color(0.1, 0.8, 0.2), "cost": 22},
 ]
+var _unlocked_slots: int = 3  # 초기 3개
+var _max_slots: int = 6       # 최대 6개
+var _slot_unlock_cost: int = 30  # 슬롯 해금 비용
 var _hint_hiding: bool = false
 var _hint_hide_tweens: Array = []
+var _unlock_animation_playing: bool = false  # 해금 애니 중엔 인디케이터 숨기지 않음
+var _pending_spawn_index: int = -1  # 재화 차감됐지만 아직 스폰 안된 슬롯 (중복 방지)
 
 # ===== 난이도 단계 (30초마다 증가) =====
 # 단계 0~3   혈체(血體)   기본 핏덩어리
@@ -138,56 +146,93 @@ func _spawn_start_nodes() -> void:
 		$EntityLayer.add_child(node)
 
 func _build_hint_dots() -> void:
-	var slot_size: int = 70
-	var spacing: int = 100
-	var total_width: int = _node_slots.size() * spacing
+	# 기존 슬롯 제거 후 1프레임 대기 (중복 connect 방지)
+	for child in _dots_container.get_children():
+		child.queue_free()
+	await get_tree().process_frame
+
+	var slot_size: int = 64
+	var spacing: int = 88
+	var total_slots: int = _max_slots
+	var total_width: int = total_slots * spacing
 	var start_x: int = (1920 - total_width) / 2
 
-	for i in range(_node_slots.size()):
-		var data = _node_slots[i]
-
-		var slot: Button = Button.new()
+	for i in range(total_slots):
+		var slot: PanelContainer = PanelContainer.new()
 		slot.custom_minimum_size = Vector2(slot_size, slot_size)
 		slot.size = Vector2(slot_size, slot_size)
-		slot.position = Vector2(start_x + i * spacing, 15)
+		slot.position = Vector2(start_x + i * spacing, 18)
+		slot.mouse_filter = Control.MOUSE_FILTER_STOP
 
-		# 노드 타입 이름
-		slot.text = data.type + "\n🩸" + str(data.cost)
-		slot.add_theme_font_size_override("font_size", 12)
-		slot.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.9))
+		if i < _unlocked_slots and i < _node_slots.size():
+			# 활성 슬롯 (PanelContainer + gui_input만 사용 - pressed.connect 없음, 중복 소비 방지)
+			var data = _node_slots[i]
+			var label: Label = Label.new()
+			label.text = data.type + "\n🩸" + str(data.cost)
+			label.add_theme_font_size_override("font_size", 12)
+			label.add_theme_color_override("font_color",
+				Color(1.0, 1.0, 1.0, 0.9))
+			label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			slot.add_child(label)
+			var style: StyleBoxFlat = StyleBoxFlat.new()
+			style.bg_color = Color(
+				data.color.r * 0.25,
+				data.color.g * 0.25,
+				data.color.b * 0.25, 0.92)
+			style.set_corner_radius_all(35)
+			style.border_color = Color(
+				data.color.r, data.color.g, data.color.b, 0.7)
+			style.border_width_left = 2
+			style.border_width_right = 2
+			style.border_width_top = 2
+			style.border_width_bottom = 2
+			slot.add_theme_stylebox_override("panel", style)
+			slot.gui_input.connect(_make_slot_input_handler(i))
 
-		# 슬롯 스타일
-		var style: StyleBoxFlat = StyleBoxFlat.new()
-		style.bg_color = Color(
-			data.color.r * 0.25,
-			data.color.g * 0.25,
-			data.color.b * 0.25, 0.92)
-		style.set_corner_radius_all(35)
-		style.border_color = Color(
-			data.color.r, data.color.g, data.color.b, 0.7)
-		style.border_width_left = 2
-		style.border_width_right = 2
-		style.border_width_top = 2
-		style.border_width_bottom = 2
-		slot.add_theme_stylebox_override("normal", style)
+		elif i == _unlocked_slots and _unlocked_slots < _max_slots:
+			# 해금 가능 슬롯 (gui_input만 사용 - pressed.connect 없음)
+			var unlock_label: Label = Label.new()
+			unlock_label.text = "🔓\n🩸" + str(_slot_unlock_cost)
+			unlock_label.add_theme_font_size_override("font_size", 12)
+			unlock_label.add_theme_color_override("font_color",
+				Color(0.8, 0.8, 0.8, 0.7))
+			unlock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			unlock_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			slot.add_child(unlock_label)
+			var lock_style: StyleBoxFlat = StyleBoxFlat.new()
+			lock_style.bg_color = Color(0.1, 0.1, 0.1, 0.7)
+			lock_style.set_corner_radius_all(35)
+			lock_style.border_color = Color(0.5, 0.5, 0.5, 0.5)
+			lock_style.border_width_left = 2
+			lock_style.border_width_right = 2
+			lock_style.border_width_top = 2
+			lock_style.border_width_bottom = 2
+			slot.add_theme_stylebox_override("panel", lock_style)
+			slot.gui_input.connect(_on_unlock_slot_gui_input)
 
-		# 호버 스타일
-		var hover: StyleBoxFlat = StyleBoxFlat.new()
-		hover.bg_color = Color(
-			data.color.r * 0.5,
-			data.color.g * 0.5,
-			data.color.b * 0.5, 1.0)
-		hover.set_corner_radius_all(35)
-		hover.border_color = Color(
-			data.color.r, data.color.g, data.color.b, 1.0)
-		hover.border_width_left = 2
-		hover.border_width_right = 2
-		hover.border_width_top = 2
-		hover.border_width_bottom = 2
-		slot.add_theme_stylebox_override("hover", hover)
+		else:
+			# 잠긴 슬롯
+			var locked_label: Label = Label.new()
+			locked_label.text = "🔒"
+			locked_label.add_theme_font_size_override("font_size", 16)
+			locked_label.add_theme_color_override("font_color",
+				Color(0.4, 0.4, 0.4, 0.5))
+			locked_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			locked_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			slot.add_child(locked_label)
+			var locked_style: StyleBoxFlat = StyleBoxFlat.new()
+			locked_style.bg_color = Color(0.05, 0.05, 0.05, 0.5)
+			locked_style.set_corner_radius_all(35)
+			locked_style.border_color = Color(0.3, 0.3, 0.3, 0.3)
+			locked_style.border_width_left = 1
+			locked_style.border_width_right = 1
+			locked_style.border_width_top = 1
+			locked_style.border_width_bottom = 1
+			slot.add_theme_stylebox_override("panel", locked_style)
+			slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 		slot.modulate.a = 0.0
-		slot.gui_input.connect(func(e): _on_slot_gui_input(e, i))
 		_dots_container.add_child(slot)
 
 	# 재화 표시: 배경 박스 + 라벨
@@ -235,6 +280,19 @@ func _build_hint_dots() -> void:
 	blood_counter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_dots_container.add_child(blood_counter)
 
+func _make_slot_input_handler(index: int) -> Callable:
+	return func(event: InputEvent): _on_slot_gui_input(event, index)
+
+func _shake_slot(index: int) -> void:
+	var slot = _dots_container.get_child(index)
+	var tween: Tween = create_tween()
+	var ox: float = slot.position.x
+	tween.tween_property(slot, "position:x", ox + 3, 0.03)
+	tween.tween_property(slot, "position:x", ox - 3, 0.03)
+	tween.tween_property(slot, "position:x", ox + 3, 0.03)
+	tween.tween_property(slot, "position:x", ox - 3, 0.03)
+	tween.tween_property(slot, "position:x", ox, 0.03)
+
 func _on_slot_gui_input(event: InputEvent, index: int) -> void:
 	if not event is InputEventMouseButton:
 		return
@@ -242,16 +300,66 @@ func _on_slot_gui_input(event: InputEvent, index: int) -> void:
 	if mb.button_index != MOUSE_BUTTON_LEFT or not mb.pressed:
 		return
 
+	# 중복 방지: 이미 이 슬롯으로 처리 중이면 무시
+	if _pending_spawn_index == index:
+		get_viewport().set_input_as_handled()
+		return
+
+	if index >= _unlocked_slots:
+		return
+
 	var data = _node_slots[index]
 
 	# 재화 확인
 	if ResourceManager.blood < data.cost:
-		# 재화 부족 - 슬롯 흔들기 (폭 줄이고 횟수 늘려서 빠르게)
-		var slot = _dots_container.get_child(index)
+		_shake_slot(index)
+		return
+
+	# 종류별 중복 체크
+	var same_type_count: int = 0
+	for n in get_tree().get_nodes_in_group("game_nodes"):
+		if n.node_type == data.type:
+			same_type_count += 1
+	if same_type_count >= 2:
+		_shake_slot(index)
+		return
+
+	# 재화 차감 (1번만)
+	_pending_spawn_index = index
+	ResourceManager.spend_blood(data.cost)
+
+	# 노드 스폰 + 드래그 시작
+	var node_scene = preload("res://scenes/GameNode.tscn")
+	var node = node_scene.instantiate()
+	node.node_id = data.id
+	node.node_type = data.type
+	node.node_color = data.color
+	node.global_position = get_viewport().get_mouse_position()
+	node._slot_position = get_viewport().get_mouse_position()
+	node.is_dragging = true
+	node._drag_offset = Vector2.ZERO
+	$EntityLayer.add_child(node)
+
+	call_deferred("_clear_pending_spawn")  # 프레임 끝에 초기화 (중복 이벤트 방지)
+	get_viewport().set_input_as_handled()
+
+func _clear_pending_spawn() -> void:
+	_pending_spawn_index = -1
+
+func _on_unlock_slot_gui_input(event: InputEvent) -> void:
+	if not event is InputEventMouseButton:
+		return
+	var mb: InputEventMouseButton = event
+	if mb.button_index != MOUSE_BUTTON_LEFT or not mb.pressed:
+		return
+	get_viewport().set_input_as_handled()
+	_unlock_next_slot()
+
+func _unlock_next_slot() -> void:
+	if ResourceManager.blood < _slot_unlock_cost:
+		var slot = _dots_container.get_child(_unlocked_slots)
 		var ox: float = slot.position.x
 		var tween: Tween = create_tween()
-		tween.tween_property(slot, "position:x", ox + 3, 0.03)
-		tween.tween_property(slot, "position:x", ox - 3, 0.03)
 		tween.tween_property(slot, "position:x", ox + 3, 0.03)
 		tween.tween_property(slot, "position:x", ox - 3, 0.03)
 		tween.tween_property(slot, "position:x", ox + 3, 0.03)
@@ -259,28 +367,58 @@ func _on_slot_gui_input(event: InputEvent, index: int) -> void:
 		tween.tween_property(slot, "position:x", ox, 0.03)
 		return
 
-	# 재화 차감
-	ResourceManager.spend_blood(data.cost)
+	ResourceManager.spend_blood(_slot_unlock_cost)
+	_unlocked_slots += 1
+	_slot_unlock_cost = int(_slot_unlock_cost * 1.5)
 
-	# 슬롯 위치에 노드 스폰 후 바로 드래그 시작
-	var slot: Control = _dots_container.get_child(index)
-	var slot_center: Vector2 = slot.global_position + slot.size / 2
-	var spawn_pos: Vector2 = slot_center + Vector2(0, -70)
+	_hint_hiding = false
+	for t in _hint_hide_tweens:
+		if t and is_instance_valid(t):
+			t.kill()
+	_hint_hide_tweens.clear()
+	await _build_hint_dots()
 
-	var node_scene = preload("res://scenes/GameNode.tscn")
-	var node = node_scene.instantiate()
-	node.node_id = data.id
-	node.node_type = data.type
-	node.node_color = data.color
-	node.global_position = spawn_pos
-	node._slot_position = spawn_pos
-	$EntityLayer.add_child(node)
+	# 해금 애니메이션 동안 인디케이터 숨기지 않음
+	_unlock_animation_playing = true
 
-	# 마우스 다운 위치에서 즉시 드래그 시작
-	node._start_drag()
+	# 해금 이펙트
+	var new_slot = _dots_container.get_child(_unlocked_slots - 1)
 
-	# 이벤트 처리 완료 표시 (Button 기본 동작 방지)
-	get_viewport().set_input_as_handled()
+	# 1. 시작: 작게 + 투명
+	new_slot.scale = Vector2(0.3, 0.3)
+	new_slot.modulate.a = 0.0
+	new_slot.pivot_offset = Vector2(32, 32)
+
+	# 2. 펑 하고 커졌다가 제자리
+	var tween: Tween = create_tween()
+	tween.tween_property(new_slot, "scale", Vector2(1.3, 1.3), 0.2
+		).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	tween.parallel().tween_property(new_slot, "modulate:a", 1.0, 0.15)
+	tween.tween_property(new_slot, "scale", Vector2(1.0, 1.0), 0.15
+		).set_ease(Tween.EASE_IN_OUT)
+
+	# 3. 슬롯 해금 이펙트
+	# 스크립트 먼저 설정 후 위치 지정해야 함
+	# HintArea가 화면 y:950 근처에 있고
+	# DotsContainer 안 슬롯 position 기준으로 계산
+	var slot_idx: int = _unlocked_slots - 1
+	var slot = _dots_container.get_children()[slot_idx]
+
+	# 슬롯의 실제 화면 좌표 계산
+	# DotsContainer는 HintArea 안에 있음
+	# HintArea position + slot position + 슬롯 중앙 offset
+	var hint_area_y: float = _hint_area.position.y
+	var slot_x: float = slot.position.x + slot.size.x / 2
+	var slot_y: float = hint_area_y + slot.position.y + slot.size.y / 2
+
+	var ring_effect: Node2D = Node2D.new()
+	ring_effect.set_script(preload("res://scripts/SlotUnlockEffect.gd"))
+	ring_effect.global_position = Vector2(slot_x, slot_y)
+	$EntityLayer.add_child(ring_effect)  # add_child는 마지막에
+
+	# SlotUnlockEffect 페이드아웃(~3초) 끝날 때까지 대기 후 플래그 해제
+	await get_tree().create_timer(3.0).timeout
+	_unlock_animation_playing = false
 
 func _get_hovered_game_node():
 	for n in get_tree().get_nodes_in_group("game_nodes"):
@@ -387,7 +525,7 @@ func _process(delta: float) -> void:
 				).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 				tween.parallel().tween_property(dot, "modulate", Color(1, 1, 1, 1), 0.25)
 	else:
-		if _hint_area.visible and not _hint_hiding:
+		if _hint_area.visible and not _hint_hiding and not _unlock_animation_playing:
 			_hint_hiding = true
 			_hint_hide_tweens.clear()
 			var area_tween: Tween = _hint_area.create_tween()
@@ -751,6 +889,25 @@ func _escape_success() -> void:
 	$CanvasLayer.add_child(label4)
 
 func _input(event: InputEvent) -> void:
+	# 우클릭: 시너지 연결 대기 중이면 취소, 아니면 노드 제거 (_input에서 처리해 GUI보다 먼저)
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+		var cm = get_tree().get_first_node_in_group("connection_manager")
+		if cm and cm._pending != null:
+			# 시너지 연결 취소
+			cm._pending.is_pending_connection = false
+			cm._pending._is_first_selected = false
+			cm._clear_highlights()
+			cm._pending = null
+			cm.queue_redraw()
+			get_viewport().set_input_as_handled()
+			return
+		# 연결 대기 중 아닐 때 노드 제거
+		var clicked_node = _get_hovered_game_node()
+		if clicked_node:
+			clicked_node.on_right_click()
+		get_viewport().set_input_as_handled()
+		return
+
 	if event is InputEventKey and event.pressed:
 		if event.keycode == KEY_Q:
 			if _left_open:

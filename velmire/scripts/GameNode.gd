@@ -17,6 +17,7 @@ var _drag_offset: Vector2 = Vector2.ZERO
 var _slot_position: Vector2 = Vector2.ZERO
 var attack_cooldown: float = 3.0
 var _attack_timer: float = 0.0
+var _has_attacked_once: bool = false  # 첫 공격 후에만 쿨다운 게이지 표시
 var synergy_double_damage: bool = false
 var synergy_fast_cooldown: bool = false
 var synergy_wide_slow: bool = false
@@ -139,10 +140,6 @@ func _input(event: InputEvent) -> void:
 					cm_sel.clear_selected()
 				is_selected = false
 
-		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed and is_hover and _is_topmost_hovered():
-			on_right_click()
-			get_viewport().set_input_as_handled()
-
 		elif event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
 			if is_dragging:
 				is_dragging = false
@@ -184,7 +181,7 @@ func _process(delta: float) -> void:
 		_attack_timer += delta
 		if _attack_timer >= attack_cooldown:
 			_attack_timer = 0.0
-			_do_attack()
+			_has_attacked_once = _do_attack()  # 적중 시에만 true, 빗나가면 false로 숨김
 
 	var mouse_dist: float = to_local(get_global_mouse_position()).length()
 	is_hovered = mouse_dist <= radius + 10.0
@@ -284,6 +281,31 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, radius * 1.8, 0, TAU, 64,
 			Color(1.0, 1.0, 0.5, pulse * 0.3), 1.5)
 
+	# 쿨다운 게이지: 첫 공격 후, 쿨타임 중일 때만 표시 (_attack_timer > 0)
+	if is_placed and _has_attacked_once and _attack_timer > 0:
+		var cooldown_ratio: float = _attack_timer / attack_cooldown
+
+		# 쿨다운 배경 링 (어두운)
+		draw_arc(Vector2.ZERO, radius + 6.0,
+			0, TAU, 64,
+			Color(0.1, 0.1, 0.1, 0.5), 3.0)
+
+		# 쿨다운 채워지는 링
+		if cooldown_ratio > 0:
+			draw_arc(Vector2.ZERO, radius + 6.0,
+				-PI / 2,
+				-PI / 2 + TAU * cooldown_ratio,
+				64,
+				Color(node_color.r, node_color.g, node_color.b, 0.85),
+				3.0)
+
+		# 쿨다운 완료 시 잠깐 번쩍
+		if _attack_timer >= attack_cooldown - 0.1:
+			draw_arc(Vector2.ZERO, radius + 6.0,
+				0, TAU, 64,
+				Color(node_color.r, node_color.g, node_color.b, 0.4),
+				5.0)
+
 func _get_ability_range() -> float:
 	match node_type:
 		"흡혈":
@@ -295,53 +317,36 @@ func _get_ability_range() -> float:
 	return 200.0
 
 func on_right_click() -> void:
+	var cm = get_tree().get_first_node_in_group("connection_manager")
+
+	# 연결 대기 중이면 취소만
+	if cm and cm._pending != null:
+		return
+
 	if not is_placed:
 		return
 
-	# 연결 상태 확인
-	var cm = get_tree().get_first_node_in_group("connection_manager")
-	var is_connected: bool = false
+	# 연결된 상태면 연결 해제만 (노드 유지)
 	if cm:
 		var conns = cm.get_connections_for(self)
-		is_connected = conns.size() > 0
+		if conns.size() > 0:
+			cm.disconnect_from(self)
+			return  # 노드 제거 안함
 
-	# 연결 해제
-	if cm:
-		cm.disconnect_from(self)
-
-	# 그리드 셀 비움
+	# 연결 없는 상태면 노드 제거 + 환불
 	var grid = get_tree().get_first_node_in_group("heart_pulse")
 	if grid and grid_col >= 0 and grid_row >= 0:
 		grid.remove_node(grid_col, grid_row)
 
-	# 재화 환불 (초기 무료 노드 2개 제외)
 	if not is_starter_node:
 		var base_cost: float = 0.0
 		match node_type:
 			"흡혈": base_cost = 10.0
 			"결계": base_cost = 15.0
 			"증폭": base_cost = 20.0
-
-		var refund: float = base_cost * (0.3 if is_connected else 0.5)
-
 		if ResourceManager:
-			ResourceManager.add_blood(refund)
+			ResourceManager.add_blood(base_cost * 0.5)
 
-		# 환불 숫자 팝업
-		var label: Label = Label.new()
-		label.text = "+%d 🩸" % int(refund)
-		label.add_theme_font_size_override("font_size", 16)
-		label.add_theme_color_override("font_color",
-			Color(0.5, 0.8, 1.0, 1.0) if is_connected else Color(1.0, 0.8, 0.3, 1.0))
-		label.global_position = global_position + Vector2(-20, -40)
-		get_parent().add_child(label)
-		var tween: Tween = label.create_tween()
-		tween.tween_property(label, "global_position",
-			label.global_position + Vector2(0, -40), 0.8)
-		tween.parallel().tween_property(label, "modulate:a", 0.0, 0.8)
-		tween.tween_callback(label.queue_free)
-
-	# 물방울 터짐 이펙트
 	_spawn_burst_effect()
 	queue_free()
 
@@ -407,18 +412,19 @@ func _return_to_slot() -> void:
 	tween.tween_property(self, "global_position", _slot_position, 0.2)\
 		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUART)
 
-func _do_attack() -> void:
+func _do_attack() -> bool:
 	match node_type:
 		"흡혈":
 			var diff: int = ResourceManager.difficulty if ResourceManager else 0
 			var damage: float = 25.0 + diff * 10.0
-			_attack_nearest_entity(damage)
+			return _attack_nearest_entity(damage)
 		"결계":
-			_slow_nearest_entity()
+			return _slow_nearest_entity()
 		"증폭":
-			_boost_adjacent_nodes()
+			return _boost_adjacent_nodes()
+	return false
 
-func _attack_nearest_entity(damage: float) -> void:
+func _attack_nearest_entity(damage: float) -> bool:
 	var entities = get_tree().get_nodes_in_group("blood_entities")
 	var nearest: Node2D = null
 	var nearest_dist: float = INF
@@ -435,30 +441,51 @@ func _attack_nearest_entity(damage: float) -> void:
 			var final_damage: float = damage
 			if synergy_double_damage and nearest.has_method("is_slowed") and nearest.is_slowed():
 				final_damage *= 2.0
+				# 시너지 데미지 적용 시 "SYNERGY!" 팝업
+				var label: Label = Label.new()
+				label.text = "SYNERGY!"
+				label.add_theme_font_size_override("font_size", 18)
+				label.add_theme_color_override("font_color",
+					Color(1.0, 0.8, 0.2, 1.0))
+				label.global_position = global_position + Vector2(-40, -50)
+				get_parent().add_child(label)
+				var tween: Tween = label.create_tween()
+				tween.tween_property(label, "global_position",
+					label.global_position + Vector2(0, -30), 0.6)
+				tween.parallel().tween_property(label, "modulate:a", 0.0, 0.6)
+				tween.tween_callback(label.queue_free)
 			nearest.take_damage(final_damage)
+		return true
+	return false
 
-func _slow_nearest_entity() -> void:
+func _slow_nearest_entity() -> bool:
 	var slow_range: float = 200.0
 	var slow_duration: float = 3.0
 	if synergy_wide_slow:
 		slow_range *= 2.0
 		slow_duration *= 2.0
 
+	var hit_any: bool = false
 	var entities = get_tree().get_nodes_in_group("blood_entities")
 	for e in entities:
 		if global_position.distance_to(e.global_position) <= slow_range:
 			if e.has_method("apply_slow"):
 				_spawn_attack_line(e.global_position)
 				e.apply_slow(0.5, slow_duration)
+				hit_any = true
+	return hit_any
 
-func _boost_adjacent_nodes() -> void:
+func _boost_adjacent_nodes() -> bool:
 	var nodes = get_tree().get_nodes_in_group("game_nodes")
+	var boosted_any: bool = false
 	for n in nodes:
 		if n == self:
 			continue
 		var d: float = global_position.distance_to(n.global_position)
 		if d < 120.0:
 			n.attack_cooldown = attack_cooldown * 0.7
+			boosted_any = true
+	return boosted_any
 
 func _spawn_attack_line(target_pos: Vector2) -> void:
 	var line = Node2D.new()
