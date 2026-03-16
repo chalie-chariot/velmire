@@ -6,6 +6,7 @@ var node_color: Color = Color(1.0, 0.0, 0.0)
 var _time: float = 0.0
 var _base_points: PackedVector2Array = []
 const CONNECT_RANGE := 400.0  # 시너지 연결 가능 거리
+const COFFIN_PLACE_RANGE := 400.0  # 관 주변 노드 배치 가능 반경
 
 var radius: float = 28.0
 var is_dragging: bool = false
@@ -37,6 +38,8 @@ var _mouse_down_pos: Vector2 = Vector2.ZERO
 var is_preview: bool = false
 var spawn_cost: int = 0  # 드롭 시 재화 소모 (0이면 이미 소유)
 var _orbit_shown: bool = false  # 필드 첫 배치 시 1회만 orbit
+var _out_of_range: bool = false
+var _range_indicator: Panel = null
 
 # 강화
 var upgrade_level: int = 0
@@ -73,7 +76,42 @@ func _generate_base_points() -> void:
 		var r: float = radius
 		_base_points.append(Vector2(cos(angle) * r, sin(angle) * r))
 
+func _update_range_indicator(show: bool) -> void:
+	if _range_indicator and is_instance_valid(_range_indicator):
+		_range_indicator.queue_free()
+		_range_indicator = null
+
+	if not show:
+		return
+
+	var indicator: Panel = Panel.new()
+	indicator.size = Vector2(90, 28)
+	var label: Label = Label.new()
+	label.text = "[관 범위 밖]"
+	label.add_theme_font_size_override("font_size", 13)
+	label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	label.offset_left = 6
+	label.offset_top = 4
+	label.offset_right = -6
+	label.offset_bottom = -4
+	indicator.add_child(label)
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.set_corner_radius_all(4)
+	style.bg_color = Color(0.15, 0.0, 0.0, 0.9)
+	style.border_color = Color(0.9, 0.2, 0.2, 1.0)
+	style.set_border_width_all(1)
+	indicator.add_theme_stylebox_override("panel", style)
+	indicator.position = global_position + Vector2(-indicator.size.x / 2, -indicator.size.y - 12)
+	get_parent().add_child(indicator)
+	_range_indicator = indicator
+
 func _start_drag() -> void:
+	_out_of_range = false
+	_update_range_indicator(false)
+	modulate = Color(1, 1, 1, 1)
 	var prev_col := grid_col
 	var prev_row := grid_row
 	if is_placed:
@@ -205,6 +243,18 @@ func _process(delta: float) -> void:
 			_range_fade_timer = -1.0
 	if is_dragging:
 		global_position = get_global_mouse_position() + _drag_offset
+		if _range_indicator and is_instance_valid(_range_indicator):
+			_range_indicator.position = global_position + Vector2(-_range_indicator.size.x / 2, -_range_indicator.size.y - 12)
+		# 드래그 중 관 범위 체크
+		var coffin = get_tree().get_first_node_in_group("coffin")
+		if coffin:
+			var coffin_center: Vector2 = coffin.global_position + coffin.size / 2
+			var dist: float = global_position.distance_to(coffin_center)
+			var out: bool = dist > COFFIN_PLACE_RANGE
+			if out != _out_of_range:
+				_out_of_range = out
+				_update_range_indicator(out)
+				modulate = Color(1, 1, 1, 0.4 if out else 1.0)
 
 	if is_placed:
 		_attack_timer += delta
@@ -432,6 +482,11 @@ func _get_node_info() -> Dictionary:
 	return {name = "", desc = "", synergy1 = "", synergy2 = "", atk = 0, cooldown = 0.0}
 
 func _try_place_on_grid() -> void:
+	if _range_indicator and is_instance_valid(_range_indicator):
+		_range_indicator.queue_free()
+		_range_indicator = null
+	modulate = Color(1, 1, 1, 1)
+
 	var mouse_pos: Vector2 = get_viewport().get_mouse_position()
 
 	# 1순위: 인디케이터 슬롯 위인지 먼저 확인
@@ -447,7 +502,16 @@ func _try_place_on_grid() -> void:
 		_return_to_slot()
 		return
 
-	# 3순위: 그리드 배치 시도
+	# 3순위: 관 범위 체크 (반경 400px)
+	var coffin = get_tree().get_first_node_in_group("coffin")
+	if coffin:
+		var coffin_center: Vector2 = coffin.global_position + coffin.size / 2
+		var dist: float = global_position.distance_to(coffin_center)
+		if dist > COFFIN_PLACE_RANGE:
+			_return_to_slot()
+			return
+
+	# 4순위: 그리드 배치 시도
 	var grid = get_tree().get_first_node_in_group("heart_pulse")
 	if not grid:
 		_return_to_slot()

@@ -112,6 +112,7 @@ var _ai_chat_started: bool = false
 var _state_timer: float = 0.0
 var _no_hit_timer: float = 0.0
 var _perfect_defense_notified: bool = false
+var _map_vignette_overlay: ColorRect = null
 
 func _ready() -> void:
 	add_to_group("main")
@@ -153,6 +154,95 @@ func _ready() -> void:
 	var viewer_bar: Control = $CanvasLayer/RightPanel/ViewerBar
 	var right_panel: Control = $CanvasLayer/RightPanel
 	viewer_bar.position = Vector2(0, right_panel.size.y - 40)
+
+	# 맵 전체 암전 (화면 중심→가장자리 서서히 어두워짐, 항상 표시)
+	_map_vignette_overlay = ColorRect.new()
+	_map_vignette_overlay.name = "MapVignetteOverlay"
+	_map_vignette_overlay.position = Vector2.ZERO
+	_map_vignette_overlay.size = Vector2(1920, 1080)
+	_map_vignette_overlay.color = Color(0, 0, 0, 0)
+	_map_vignette_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var vignette_shader = load("res://shaders/map_vignette.gdshader") as Shader
+	if vignette_shader:
+		var mat = ShaderMaterial.new()
+		mat.shader = vignette_shader
+		mat.set_shader_parameter("viewport_size", Vector2(1920, 1080))
+		mat.set_shader_parameter("darken_strength", 0.45)
+		mat.set_shader_parameter("bright_radius_0", 0.0)
+		mat.set_shader_parameter("bright_radius_1", 0.0)
+		_map_vignette_overlay.material = mat
+	$CanvasLayer.add_child(_map_vignette_overlay)
+	$CanvasLayer.move_child(_map_vignette_overlay, 0)
+	_map_vignette_overlay.z_index = -1000
+
+## 아이템으로 암전의 특정 영역을 밝힐 때 사용. area_index: 0 또는 1, center: 화면 좌표, radius: 밝은 반경(px), strength: 0~1
+func set_vignette_bright_area(area_index: int, center: Vector2, radius: float, strength: float = 1.0) -> void:
+	if not _map_vignette_overlay or not (_map_vignette_overlay.material is ShaderMaterial):
+		return
+	var mat: ShaderMaterial = _map_vignette_overlay.material
+	if area_index == 0:
+		mat.set_shader_parameter("bright_center_0", center)
+		mat.set_shader_parameter("bright_radius_0", radius)
+		mat.set_shader_parameter("bright_strength_0", strength)
+	elif area_index == 1:
+		mat.set_shader_parameter("bright_center_1", center)
+		mat.set_shader_parameter("bright_radius_1", radius)
+		mat.set_shader_parameter("bright_strength_1", strength)
+
+## 밝은 영역 해제
+func clear_vignette_bright_area(area_index: int) -> void:
+	if not _map_vignette_overlay or not (_map_vignette_overlay.material is ShaderMaterial):
+		return
+	var mat: ShaderMaterial = _map_vignette_overlay.material
+	if area_index == 0:
+		mat.set_shader_parameter("bright_radius_0", 0.0)
+	elif area_index == 1:
+		mat.set_shader_parameter("bright_radius_1", 0.0)
+
+func _register_ring_light(ring: Node2D) -> void:
+	print("링라이트 등록 위치:", ring.global_position)
+	var lights = get_tree().get_nodes_in_group("ring_light")
+	var placed: Array = []
+	for l in lights:
+		if "is_placed" in l and l.is_placed:
+			placed.append(l)
+	var idx = placed.size() - 1
+	print("설치 인덱스:", idx)
+
+	if _map_vignette_overlay and _map_vignette_overlay.material:
+		print("셰이더 파라미터 설정 시도")
+		if idx == 0:
+			_map_vignette_overlay.material.set_shader_parameter(
+				"bright_center_0", ring.global_position)
+			_map_vignette_overlay.material.set_shader_parameter(
+				"bright_radius_0", ring.range_radius)
+			_map_vignette_overlay.material.set_shader_parameter(
+				"bright_strength_0", 2.0)
+			print("bright_center_0:", ring.global_position)
+			print("bright_radius_0:", ring.range_radius)
+		elif idx == 1:
+			_map_vignette_overlay.material.set_shader_parameter(
+				"bright_center_1", ring.global_position)
+			_map_vignette_overlay.material.set_shader_parameter(
+				"bright_radius_1", ring.range_radius)
+			_map_vignette_overlay.material.set_shader_parameter(
+				"bright_strength_1", 2.0)
+	else:
+		print("셰이더 없음")
+	_build_owned_nodes()
+
+func _spawn_ring_light() -> void:
+	if ResourceManager.ruby < 2:
+		_show_deny_popup("루비 부족 🔴2 필요")
+		return
+	ResourceManager.spend_ruby(2)
+	update_ruby_ui(ResourceManager.ruby)
+	var RingLightScript = preload("res://scripts/RingLight.gd")
+	var ring = RingLightScript.new()
+	ring.global_position = get_viewport().get_mouse_position()
+	ring.is_dragging = true
+	$EntityLayer.add_child(ring)
+	_build_owned_nodes()
 
 func show_tooltip(info: Dictionary, node_color: Color, node: Node2D = null) -> void:
 	var level_text: String = ""
@@ -479,6 +569,32 @@ func _build_owned_nodes() -> void:
 		row.add_child(cost_label)
 		row.gui_input.connect(func(ev): _on_owned_node_input(ev, data))
 		_owned_container.add_child(row)
+
+	# 링라이트 버튼
+	var installed = 0
+	for l in get_tree().get_nodes_in_group("ring_light"):
+		if "is_placed" in l and l.is_placed:
+			installed += 1
+
+	var ring_btn = Button.new()
+	ring_btn.custom_minimum_size = Vector2(190, 52)
+	ring_btn.text = "링라이트  🔴2\n설치 %d / 3" % installed
+
+	var ring_style = StyleBoxFlat.new()
+	ring_style.bg_color = Color(0.15, 0.12, 0.05, 1.0)
+	ring_style.border_color = Color(1.0, 0.9, 0.5, 0.8)
+	ring_style.set_border_width_all(1)
+	ring_btn.add_theme_stylebox_override("normal", ring_style)
+
+	if installed >= 3:
+		ring_btn.disabled = true
+
+	ring_btn.gui_input.connect(func(ev):
+		if ev is InputEventMouseButton and \
+		   ev.button_index == MOUSE_BUTTON_LEFT and ev.pressed:
+			_spawn_ring_light()
+	)
+	_owned_container.add_child(ring_btn)
 
 	# 4. 빈 슬롯 3개 (클릭해도 아무 동작 안함)
 	for _i in range(3):

@@ -4,6 +4,7 @@ class_name HeartPulse
 const GRID_COLS: int = 24
 const GRID_ROWS: int = 14
 const CELL_SIZE: int = 80
+const COFFIN_RANGE: float = 400.0  # 노드 배치 가능 관 주변 반경
 
 var grid_offset: Vector2 = Vector2.ZERO
 var _coffin_center: Vector2 = Vector2(960, 540)
@@ -49,6 +50,10 @@ func _start_pulse() -> void:
 	_pulsing = true
 
 func _draw() -> void:
+	# 관 범위 원형 외곽선 (항상 표시)
+	draw_arc(_coffin_center, COFFIN_RANGE, 0, TAU, 128,
+		Color(1.0, 0.4, 0.4, 0.2), 1.5)
+
 	var max_dist: float = 800.0
 	var min_alpha: float = 0.03
 	var max_alpha: float = 0.25

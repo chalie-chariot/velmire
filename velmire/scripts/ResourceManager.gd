@@ -14,7 +14,7 @@ var total_runs: int = 0
 var total_kills: int = 0
 var best_viewers: int = 0
 
-var ruby: int = 0  # 블러디아 루비
+var ruby: int = 100  # 블러디아 루비 (테스트용 초기값)
 
 
 func add_ruby(amount: int) -> void:
