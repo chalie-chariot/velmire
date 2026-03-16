@@ -88,27 +88,38 @@ func _on_pulse_timer_timeout() -> void:
 func _emit_pulse() -> void:
 	var pts = 64
 	var center_pos = global_position
-	var pulse = Line2D.new()
-	pulse.default_color = Color(1.0, 0.9, 0.6, 0.8)
-	pulse.width = 3.0
-	pulse.antialiased = true
-	for p in range(pts + 1):
-		var a = (TAU / pts) * p
-		pulse.add_point(center_pos + Vector2(cos(a), sin(a)) * 10.0)
-	get_parent().add_child(pulse)
 
-	var updater = _make_pulse_updater(pulse, pts, center_pos)
-	var tw = create_tween()
-	tw.tween_method(updater, 0.0, 1.0, 2.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tw.tween_callback(_on_pulse_done.bind(pulse)).set_delay(2.0)
+	for wave in range(2):
+		var pulse = Line2D.new()
+		pulse.default_color = Color(1.0, 0.9, 0.6, 0.0)
+		pulse.width = 3.0
+		pulse.antialiased = true
+		for p in range(pts + 1):
+			var a = (TAU / pts) * p
+			pulse.add_point(center_pos + Vector2(cos(a), sin(a)) * 5.0)
+		get_parent().add_child(pulse)
+
+		var wave_delay = wave * 0.3
+		var updater = _make_pulse_updater(pulse, pts, center_pos)
+
+		var tw = create_tween()
+		tw.tween_interval(wave_delay)
+		tw.tween_method(updater, 0.0, 1.0, 2.5
+		).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tw.tween_callback(_on_pulse_done.bind(pulse))
 
 func _make_pulse_updater(pulse: Line2D, pts: int, center_pos: Vector2) -> Callable:
 	return func(t: float):
 		if not is_instance_valid(pulse):
 			return
-		var r = lerp(10.0, range_radius, t)
-		pulse.default_color = Color(1.0, 0.9, 0.6, lerp(0.8, 0.0, t))
-		pulse.width = lerp(3.0, 0.5, t)
+		var r = lerp(5.0, range_radius * 1.15, t)
+		var alpha: float
+		if t < 0.15:
+			alpha = lerp(0.0, 0.7, t / 0.15)
+		else:
+			alpha = lerp(0.7, 0.0, (t - 0.15) / 0.85)
+		pulse.default_color = Color(1.0, 0.95, 0.7, alpha)
+		pulse.width = lerp(4.0, 0.3, t)
 		for i in range(pts + 1):
 			var a = (TAU / pts) * i
 			pulse.set_point_position(i, center_pos + Vector2(cos(a), sin(a)) * r)
