@@ -1724,6 +1724,8 @@ func _play_upgrade_effect(node: Node2D) -> void:
 	orbit_angles.resize(count)
 	var dots: Array = []
 	var tails: Array = []
+	var expand_done_counter: RefCounted = RefCounted.new()
+	expand_done_counter.set_meta("done", 0)
 
 	for i in range(count):
 		var final_angle: float = (TAU / count) * i + randf_range(-0.3, 0.3)
@@ -1731,6 +1733,19 @@ func _play_upgrade_effect(node: Node2D) -> void:
 		orbit_angles[i] = final_angle
 
 		var dot_size: float = randf_range(7, 16)
+		var glow_size: float = dot_size * 3.5
+		var core_size: float = dot_size * 0.4
+		# 1. 외곽 글로우 (가장 크고 흐림)
+		var glow: Panel = Panel.new()
+		glow.size = Vector2(glow_size, glow_size)
+		var gs: StyleBoxFlat = StyleBoxFlat.new()
+		gs.set_corner_radius_all(int(glow_size / 2))
+		gs.bg_color = Color(color.r, color.g, color.b, 0.15)
+		glow.add_theme_stylebox_override("panel", gs)
+		glow.position = center - Vector2(glow_size, glow_size) * 0.5
+		glow.z_index = 10
+		$EntityLayer.add_child(glow)
+		# 2. 중간 색상 원 (노드 색)
 		var dot: Panel = Panel.new()
 		dot.size = Vector2(dot_size, dot_size)
 		var s: StyleBoxFlat = StyleBoxFlat.new()
@@ -1738,25 +1753,45 @@ func _play_upgrade_effect(node: Node2D) -> void:
 		s.bg_color = color
 		dot.add_theme_stylebox_override("panel", s)
 		dot.position = center - Vector2(dot_size, dot_size) * 0.5
+		dot.z_index = 11
 		$EntityLayer.add_child(dot)
+		# 3. 중심 흰색 점 (가장 작고 밝음)
+		var core: Panel = Panel.new()
+		core.size = Vector2(core_size, core_size)
+		var cs: StyleBoxFlat = StyleBoxFlat.new()
+		cs.set_corner_radius_all(int(core_size / 2))
+		cs.bg_color = Color(1.0, 1.0, 1.0, 1.0)
+		core.add_theme_stylebox_override("panel", cs)
+		core.position = center - Vector2(core_size, core_size) * 0.5
+		core.z_index = 12
+		$EntityLayer.add_child(core)
 
 		var tail: Line2D = Line2D.new()
 		tail.default_color = color
-		tail.width = randf_range(2.0, 3.5)
 		tail.antialiased = true
+		# 파티클쪽 두껍게(거의 크기 동일), 꼬리끝 가늘게
+		var wcurve: Curve = Curve.new()
+		wcurve.add_point(Vector2(0.0, 0.15))  # 꼬리끝: 가늘게
+		wcurve.add_point(Vector2(1.0, 1.0))  # 파티클쪽: 최대 두께
+		tail.width_curve = wcurve
+		tail.width = dot_size * 0.9  # 파티클 크기에 맞춘 최대 굵기
 		for _p in range(8):
 			tail.add_point(center)
 		$EntityLayer.add_child(tail)
 		tail.visible = false
 
-		dots.append({"node": dot, "size": dot_size, "radius": final_radius})
+		dots.append({"node": dot, "glow": glow, "core": core, "size": dot_size, "glow_size": glow_size, "core_size": core_size, "radius": final_radius})
 		tails.append(tail)
 
 		# 빠른 회전 + 반경 확장 트윈
 		var start_angle: float = final_angle - TAU * randf_range(1.5, 2.5)
 		var captured_dot: Panel = dot
 		var captured_tail: Line2D = tail
+		var captured_glow: Panel = glow
+		var captured_core: Panel = core
 		var captured_size: float = dot_size
+		var captured_glow_size: float = glow_size
+		var captured_core_size: float = core_size
 		var captured_start_angle: float = start_angle
 		var captured_final_angle: float = final_angle
 		var captured_final_radius: float = final_radius
@@ -1764,61 +1799,71 @@ func _play_upgrade_effect(node: Node2D) -> void:
 		for _h in range(8):
 			pos_history.append(center)
 
-		var expand_duration: float = randf_range(0.6, 1.0)
+		var expand_duration: float = randf_range(1.5, 2.2)
 		var captured_i: int = i
+		orbit_angles[captured_i] = captured_start_angle
 
 		var expand_cb: Callable = func(t: float) -> void:
 			if not is_instance_valid(captured_dot):
 				return
 			var eased_t: float = 1.0 - pow(1.0 - t, 3.0)
-			var cur_angle: float = lerp(captured_start_angle, captured_final_angle, eased_t)
+			var spin_speed: float = lerp(8.0, 0.3, eased_t)
+			orbit_angles[captured_i] += spin_speed * _last_delta
+			var cur_angle: float = orbit_angles[captured_i]
 			var cur_radius: float = lerp(0.0, captured_final_radius, eased_t)
 			var cur_pos: Vector2 = center + Vector2(cos(cur_angle), sin(cur_angle)) * cur_radius
-			captured_dot.position = cur_pos - Vector2(captured_size, captured_size) * 0.5
+			var half_dot: Vector2 = Vector2(captured_size, captured_size) * 0.5
+			var half_glow: Vector2 = Vector2(captured_glow_size, captured_glow_size) * 0.5
+			var half_core: Vector2 = Vector2(captured_core_size, captured_core_size) * 0.5
+			captured_dot.position = cur_pos - half_dot
+			if is_instance_valid(captured_glow):
+				captured_glow.position = cur_pos - half_glow
+			if is_instance_valid(captured_core):
+				captured_core.position = cur_pos - half_core
 			pos_history.pop_front()
 			pos_history.append(cur_pos)
 			if is_instance_valid(captured_tail):
 				captured_tail.visible = true
 				for p in range(8):
 					captured_tail.set_point_position(p, pos_history[p])
-				captured_tail.width = lerp(4.0, 1.5, eased_t)
+				captured_tail.width = captured_size * 0.9
 
 		var expand_tw: Tween = create_tween()
 		expand_tw.tween_method(expand_cb, 0.0, 1.0, expand_duration).set_trans(Tween.TRANS_LINEAR)
 		expand_tw.tween_callback(func() -> void:
 			orbit_angles[captured_i] = captured_final_angle
+			var n: int = expand_done_counter.get_meta("done") + 1
+			expand_done_counter.set_meta("done", n)
 		)
 
-	# expand 완료 대기 후 회전 부유
-	await get_tree().create_timer(1.0).timeout
-
-	var orbit_time: float = 0.0
-	var orbit_duration: float = 1.5
-	var orbit_speed: float = 0.2
-
-	while orbit_time < orbit_duration:
-		var dt: float = _last_delta
-		orbit_time += dt
-
-		for i in range(count):
-			if not is_instance_valid(dots[i]["node"]):
-				continue
-			orbit_angles[i] = orbit_angles[i] + orbit_speed * dt
-			var cur_pos: Vector2 = center + Vector2(cos(orbit_angles[i]), sin(orbit_angles[i])) * dots[i]["radius"]
-
-			var tail_ref: Line2D = tails[i]
-			for p in range(7):
-				tail_ref.set_point_position(p, tail_ref.get_point_position(p + 1))
-			tail_ref.set_point_position(7, cur_pos)
-
-			dots[i]["node"].position = cur_pos - Vector2(dots[i]["size"], dots[i]["size"]) * 0.5
-
+	# expand 전부 완료까지 대기 후 흡수 페이즈
+	while expand_done_counter.get_meta("done") < count:
 		await get_tree().process_frame
 
 	# === 페이즈 3: 흡수 + 노드 스케일 바운스 ===
 	var counter: RefCounted = RefCounted.new()
 	counter.set_meta("arrived", 0)
 	counter.set_meta("restore_done", false)
+
+	# 흡수 중 노드 중앙 발광 (부드러운 산란 - 8층 미세 그라데이션)
+	var ng_size: float = 44.0
+	var glow_container: Node2D = Node2D.new()
+	glow_container.position = node.global_position
+	var layer_scales: Array[float] = [1.0, 1.12, 1.25, 1.4, 1.58, 1.78, 2.0, 2.25]
+	var layer_alphas: Array[float] = [0.42, 0.34, 0.27, 0.2, 0.14, 0.09, 0.05, 0.02]
+	for l in range(8):
+		var ls: float = ng_size * layer_scales[l]
+		var lp: Panel = Panel.new()
+		lp.size = Vector2(ls, ls)
+		lp.position = Vector2(-ls, -ls) * 0.5
+		lp.pivot_offset = Vector2(ls, ls) * 0.5
+		var lps: StyleBoxFlat = StyleBoxFlat.new()
+		lps.set_corner_radius_all(int(ls / 2))
+		lps.bg_color = Color(color.r, color.g, color.b, 0.0)
+		lp.add_theme_stylebox_override("panel", lps)
+		lp.set_meta("base_alpha", layer_alphas[l])
+		glow_container.add_child(lp)
+	$EntityLayer.add_child(glow_container)
 
 	if _upgrade_scale_tween:
 		_upgrade_scale_tween.kill()
@@ -1830,7 +1875,11 @@ func _play_upgrade_effect(node: Node2D) -> void:
 		var captured_start: Vector2 = dot_center_pos
 		var captured_dot: Panel = dots[i]["node"]
 		var captured_tail: Line2D = tails[i]
+		var captured_glow: Panel = dots[i]["glow"]
+		var captured_core: Panel = dots[i]["core"]
 		var captured_size: float = dots[i]["size"]
+		var captured_glow_size: float = dots[i]["glow_size"]
+		var captured_core_size: float = dots[i]["core_size"]
 		var pos_history: Array = []
 		for _h in range(8):
 			pos_history.append(captured_start)
@@ -1839,7 +1888,7 @@ func _play_upgrade_effect(node: Node2D) -> void:
 		var absorb_tw: Tween = create_tween()
 		absorb_tw.tween_interval(delay)
 		absorb_tw.tween_method(
-			func(t: float) -> void: _absorb_particle(captured_dot, captured_tail, captured_start, center, captured_size, pos_history, t),
+			func(t: float) -> void: _absorb_particle(captured_dot, captured_tail, captured_start, center, captured_size, pos_history, t, captured_glow, captured_core, captured_glow_size, captured_core_size),
 			0.0, 1.0, randf_range(0.4, 0.7)
 		).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_IN)
 
@@ -1848,40 +1897,88 @@ func _play_upgrade_effect(node: Node2D) -> void:
 				captured_dot.queue_free()
 			if is_instance_valid(captured_tail):
 				captured_tail.queue_free()
+			if is_instance_valid(captured_glow):
+				captured_glow.queue_free()
+			if is_instance_valid(captured_core):
+				captured_core.queue_free()
 			var n: int = counter.get_meta("arrived") + 1
 			counter.set_meta("arrived", n)
-			print("arrived:", n, "/", count)
+			# arrived 증가할수록 발광 세기 증가 (다층 산란)
+			var glow_intensity: float = float(n) / float(count)
+			for ch in glow_container.get_children():
+				if ch is Panel:
+					var base_a: float = ch.get_meta("base_alpha", 0.5)
+					var lp_style: StyleBoxFlat = StyleBoxFlat.new()
+					lp_style.set_corner_radius_all(int(ch.size.x / 2))
+					lp_style.bg_color = Color(color.r, color.g, color.b, glow_intensity * base_a)
+					ch.add_theme_stylebox_override("panel", lp_style)
+			glow_container.scale = Vector2(1.0 + glow_intensity * 0.9, 1.0 + glow_intensity * 0.9)
 			if n >= count and not counter.get_meta("restore_done") and is_instance_valid(node):
 				counter.set_meta("restore_done", true)
-				print("복구 호출")
-				call_deferred("_restore_node_scale_and_wave", node, color)
+				call_deferred("_restore_node_scale_and_wave", node, color, glow_container)
 		)
 
-func _restore_node_scale_and_wave(node: Node2D, color: Color) -> void:
-	print("복구 시작 - 현재 scale:", node.scale)
+func _restore_node_scale_and_wave(node: Node2D, color: Color, glow_container: Node2D = null) -> void:
 	if not is_instance_valid(node):
 		return
 	if _upgrade_scale_tween:
-		print("기존 트윈 kill")
 		_upgrade_scale_tween.kill()
 	_upgrade_scale_tween = create_tween()
 	_upgrade_scale_tween.tween_property(node, "scale", Vector2(1.0, 1.0), 0.4).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 	_upgrade_scale_tween.tween_callback(func() -> void:
-		print("복구 완료 - 현재 scale:", node.scale)
 		_upgrade_scale_tween = null
 	)
+
+	# 발광 최대 → 서서히 꺼짐 + 잔광(afterglow) 효과
+	if is_instance_valid(glow_container):
+		var fade_glow: Tween = create_tween()
+		fade_glow.set_parallel(true)
+		fade_glow.tween_property(glow_container, "modulate", Color(1, 1, 1, 0), 0.5).set_ease(Tween.EASE_IN)
+		fade_glow.tween_property(glow_container, "scale", Vector2(2.0, 2.0), 0.5).set_ease(Tween.EASE_OUT)
+		fade_glow.tween_callback(glow_container.queue_free).set_delay(0.5)
+
+		# 잔광: 주 발광이 꺼질 때 남는 부드러운 잔상
+		var center_pos: Vector2 = node.global_position
+		var ag_size: float = 64.0
+		var afterglow: Panel = Panel.new()
+		afterglow.size = Vector2(ag_size, ag_size)
+		afterglow.position = center_pos - Vector2(ag_size, ag_size) * 0.5
+		afterglow.pivot_offset = Vector2(ag_size, ag_size) * 0.5
+		var ags: StyleBoxFlat = StyleBoxFlat.new()
+		ags.set_corner_radius_all(int(ag_size / 2))
+		ags.bg_color = Color(color.r, color.g, color.b, 0.12)
+		afterglow.add_theme_stylebox_override("panel", ags)
+		$EntityLayer.add_child(afterglow)
+		var ag_tween: Tween = create_tween()
+		ag_tween.set_parallel(true)
+		ag_tween.tween_property(afterglow, "modulate", Color(1, 1, 1, 0), 1.0).set_ease(Tween.EASE_IN)
+		ag_tween.tween_property(afterglow, "scale", Vector2(1.8, 1.8), 1.0).set_ease(Tween.EASE_OUT)
+		ag_tween.tween_callback(afterglow.queue_free).set_delay(1.0)
+
+	# node 자체 순간 발광 후 원상복구
+	node.modulate = Color(1.0 + color.r * 2.0, 1.0 + color.g * 2.0, 1.0 + color.b * 2.0, 1.0)
+	var node_fade: Tween = create_tween()
+	node_fade.tween_property(node, "modulate", Color(1, 1, 1, 1), 0.6).set_ease(Tween.EASE_IN)
+
 	_final_wave(node, color)
 
-func _absorb_particle(dot: Panel, tail: Line2D, start: Vector2, center: Vector2, size: float, pos_history: Array, t: float) -> void:
+func _absorb_particle(dot: Panel, tail: Line2D, start: Vector2, center: Vector2, size: float, pos_history: Array, t: float, glow: Panel = null, core: Panel = null, glow_size: float = 0.0, core_size: float = 0.0) -> void:
 	if not is_instance_valid(dot):
 		return
 	var cur_pos: Vector2 = start.lerp(center, t)
-	dot.position = cur_pos - Vector2(size, size) * 0.5
+	var half_dot: Vector2 = Vector2(size, size) * 0.5
+	dot.position = cur_pos - half_dot
+	if is_instance_valid(glow) and glow_size > 0.0:
+		glow.position = cur_pos - Vector2(glow_size, glow_size) * 0.5
+	if is_instance_valid(core) and core_size > 0.0:
+		core.position = cur_pos - Vector2(core_size, core_size) * 0.5
 	pos_history.pop_front()
 	pos_history.append(cur_pos)
 	if is_instance_valid(tail):
 		for p in range(8):
 			tail.set_point_position(p, pos_history[p])
+		# 흡수 시 전체 축소 (gradient 유지: 파티클쪽 두껍게, 꼬리끝 가늘게)
+		tail.width = lerp(size * 0.9, 0.2, t)
 
 func _final_wave(node: Node2D, color: Color) -> void:
 	if not is_instance_valid(node):
