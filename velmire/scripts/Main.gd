@@ -51,7 +51,12 @@ var _shake_duration: float = 0.0
 var _shake_offset: Vector2 = Vector2.ZERO
 var _vignette_tween: Tween
 var _displayed_blood: float = 0.0
+var _last_blood_value: float = -1.0  # 이전 혈액값 (스케일 조건: |diff| >= 5)
 var _blood_tween: Tween
+var _blood_anim_tween: Tween
+var _upgrade_scale_tween: Tween  # 파티클 흡수 시 바운스용
+var _last_delta: float = 0.016
+var _blood_counter_ref: Label
 var _node_slots: Array = [
 	{"id": "absorb", "type": "흡혈", "color": Color(0.9, 0.1, 0.1), "cost": 10},
 	{"id": "freeze", "type": "결계", "color": Color(0.1, 0.3, 0.9), "cost": 15},
@@ -63,7 +68,7 @@ var _node_slots: Array = [
 var _unlocked_slots: int = 3  # 초기 3개
 var _max_slots: int = 6       # 최대 6개
 const _num_node_type_slots: int = 3  # 구매 가능 노드 종류 수 (흡혈/결계/증폭) — 그 외는 빈 슬롯
-var _slot_unlock_cost: int = 30  # 슬롯 해금 비용
+const _slot_unlock_costs: Array = [20, 33, 45]  # 슬롯 4·5·6 해금 비용
 var _hint_hiding: bool = false
 var _hint_hide_tweens: Array = []
 var _unlock_animation_playing: bool = false  # 해금 애니 중엔 인디케이터 숨기지 않음
@@ -244,7 +249,10 @@ func _build_hint_dots() -> void:
 	blood_counter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	blood_counter.position = Vector2(1920 / 2 - 80, 895)
 	blood_counter.visible = true
+	blood_counter.text = "🩸 %d" % ResourceManager.blood
 	$CanvasLayer.add_child(blood_counter)
+	_blood_counter_ref = blood_counter
+	_displayed_blood = ResourceManager.blood
 
 	for i in range(6):
 		if i < _slot_data.size():
@@ -388,7 +396,7 @@ func _update_slot_visual(index: int) -> void:
 		style.border_color = Color(0.5, 0.15, 0.15, 0.8)
 		slot.add_theme_stylebox_override("panel", style)
 		var lock_label: Label = Label.new()
-		lock_label.text = "🔒\n🩸%d" % _slot_unlock_cost
+		lock_label.text = "🔒\n🩸%d" % _get_slot_unlock_cost()
 		lock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lock_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		lock_label.add_theme_font_size_override("font_size", 11)
@@ -680,8 +688,19 @@ func _on_unlock_slot_gui_input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 	_unlock_next_slot()
 
+func _get_slot_unlock_cost() -> int:
+	if _unlocked_slots >= 6:
+		return 0
+	var idx: int = _unlocked_slots - 3
+	if idx >= 0 and idx < _slot_unlock_costs.size():
+		return int(_slot_unlock_costs[idx])
+	return 0
+
 func _unlock_next_slot() -> void:
-	if ResourceManager.blood < _slot_unlock_cost:
+	var cost: int = _get_slot_unlock_cost()
+	if cost <= 0:
+		return
+	if ResourceManager.blood < cost:
 		var slot = _dots_container.get_child(_unlocked_slots)
 		var ox: float = slot.position.x
 		var tween: Tween = create_tween()
@@ -692,9 +711,8 @@ func _unlock_next_slot() -> void:
 		tween.tween_property(slot, "position:x", ox, 0.03)
 		return
 
-	ResourceManager.spend_blood(_slot_unlock_cost)
+	ResourceManager.spend_blood(cost)
 	_unlocked_slots += 1
-	_slot_unlock_cost = int(_slot_unlock_cost * 1.5)
 
 	_hint_hiding = false
 	for t in _hint_hide_tweens:
@@ -879,6 +897,7 @@ func _show_combo_popup(count: int, multiplier: float) -> void:
 	tween.tween_callback(label.queue_free)
 
 func _process(delta: float) -> void:
+	_last_delta = delta
 	if Input.is_key_pressed(KEY_P):
 		if not _debug_slot_pos_printed:
 			_debug_slot_pos_printed = true
@@ -1098,10 +1117,7 @@ func _process(delta: float) -> void:
 					_hint_hide_tweens.clear()
 			)
 
-	# 재화 표시 업데이트 (HintArea visible 여부와 무관하게 항상)
-	var blood_counter = $CanvasLayer.get_node_or_null("BloodCounter")
-	if blood_counter and is_instance_valid(blood_counter):
-		blood_counter.text = "🩸 %d" % ResourceManager.blood
+	# BloodCounter는 update_blood_ui()에서 애니메이션으로 갱신 (blood_changed 시그널)
 
 	# 드래그 중인 노드가 인디케이터 슬롯 위에 있는지 감지
 	var dragging_node: Node2D = null
@@ -1617,6 +1633,7 @@ func _open_upgrade_menu(node: Node2D) -> void:
 		ResourceManager.spend_blood(cost)
 		node_ref.upgrade_level += 1
 		_apply_upgrade(node_ref)
+		_play_upgrade_effect(node_ref)
 		popup.queue_free()
 	)
 	popup.add_child(btn)
@@ -1640,6 +1657,391 @@ func _apply_upgrade(node: Node2D) -> void:
 			node.slow_duration += 1.0
 		"resonate":
 			node.cooldown_reduction = min(node.cooldown_reduction + 0.15, 0.8)
+
+func _play_upgrade_effect(node: Node2D) -> void:
+	if not is_instance_valid(node) or not node.get("node_color"):
+		return
+	var color: Color = node.node_color
+	var center: Vector2 = node.global_position
+	var count: int = 25
+	var orbit_radius: float = 200.0
+
+	# === 페이즈 1: Line2D 파장 링 (퍼지며 얇아지고 사라짐) ===
+	var wave_points: int = 64
+	var ring: Line2D = Line2D.new()
+	ring.width = 3.0
+	ring.default_color = Color(color.r, color.g, color.b, 0.9)
+	ring.antialiased = true
+	for p in range(wave_points + 1):
+		var a: float = (TAU / wave_points) * p
+		ring.add_point(center + Vector2(cos(a), sin(a)) * 20.0)
+	$EntityLayer.add_child(ring)
+
+	var ring_cb: Callable = func(t: float) -> void:
+		if not is_instance_valid(ring):
+			return
+		var radius: float = lerp(20.0, 220.0, t)
+		var alpha: float = lerp(0.9, 0.0, t)
+		ring.width = lerp(4.0, 0.5, t)
+		ring.default_color = Color(color.r, color.g, color.b, alpha)
+		for p in range(wave_points + 1):
+			var a: float = (TAU / wave_points) * p
+			ring.set_point_position(p, center + Vector2(cos(a), sin(a)) * radius)
+
+	var ring_tween: Tween = create_tween()
+	ring_tween.set_parallel(true)
+	ring_tween.tween_method(ring_cb, 0.0, 1.0, 0.4).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	ring_tween.tween_callback(ring.queue_free).set_delay(0.4)
+
+	# 2번째 잔파
+	var ring2: Line2D = Line2D.new()
+	ring2.width = 1.5
+	ring2.default_color = Color(color.r, color.g, color.b, 0.5)
+	ring2.antialiased = true
+	for p in range(wave_points + 1):
+		var a: float = (TAU / wave_points) * p
+		ring2.add_point(center + Vector2(cos(a), sin(a)) * 20.0)
+	$EntityLayer.add_child(ring2)
+
+	var ring2_cb: Callable = func(t: float) -> void:
+		if not is_instance_valid(ring2):
+			return
+		var radius: float = lerp(20.0, 280.0, t)
+		var alpha: float = lerp(0.5, 0.0, t)
+		ring2.width = lerp(2.0, 0.3, t)
+		ring2.default_color = Color(color.r, color.g, color.b, alpha)
+		for p in range(wave_points + 1):
+			var a: float = (TAU / wave_points) * p
+			ring2.set_point_position(p, center + Vector2(cos(a), sin(a)) * radius)
+
+	var ring2_tween: Tween = create_tween()
+	ring2_tween.tween_interval(0.1)
+	ring2_tween.tween_method(ring2_cb, 0.0, 1.0, 0.5).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	ring2_tween.tween_callback(ring2.queue_free).set_delay(0.6)
+
+	# === 페이즈 2: 파티클 생성 (빠른 회전 + 반경 확장 + 감속 → orbit 도달) ===
+	var orbit_angles: Array = []
+	orbit_angles.resize(count)
+	var dots: Array = []
+	var tails: Array = []
+
+	for i in range(count):
+		var final_angle: float = (TAU / count) * i + randf_range(-0.3, 0.3)
+		var final_radius: float = randf_range(orbit_radius * 0.6, orbit_radius)
+		orbit_angles[i] = final_angle
+
+		var dot_size: float = randf_range(7, 16)
+		var dot: Panel = Panel.new()
+		dot.size = Vector2(dot_size, dot_size)
+		var s: StyleBoxFlat = StyleBoxFlat.new()
+		s.set_corner_radius_all(int(dot_size / 2))
+		s.bg_color = color
+		dot.add_theme_stylebox_override("panel", s)
+		dot.position = center - Vector2(dot_size, dot_size) * 0.5
+		$EntityLayer.add_child(dot)
+
+		var tail: Line2D = Line2D.new()
+		tail.default_color = color
+		tail.width = randf_range(2.0, 3.5)
+		tail.antialiased = true
+		for _p in range(8):
+			tail.add_point(center)
+		$EntityLayer.add_child(tail)
+		tail.visible = false
+
+		dots.append({"node": dot, "size": dot_size, "radius": final_radius})
+		tails.append(tail)
+
+		# 빠른 회전 + 반경 확장 트윈
+		var start_angle: float = final_angle - TAU * randf_range(1.5, 2.5)
+		var captured_dot: Panel = dot
+		var captured_tail: Line2D = tail
+		var captured_size: float = dot_size
+		var captured_start_angle: float = start_angle
+		var captured_final_angle: float = final_angle
+		var captured_final_radius: float = final_radius
+		var pos_history: Array[Vector2] = []
+		for _h in range(8):
+			pos_history.append(center)
+
+		var expand_duration: float = randf_range(0.6, 1.0)
+		var captured_i: int = i
+
+		var expand_cb: Callable = func(t: float) -> void:
+			if not is_instance_valid(captured_dot):
+				return
+			var eased_t: float = 1.0 - pow(1.0 - t, 3.0)
+			var cur_angle: float = lerp(captured_start_angle, captured_final_angle, eased_t)
+			var cur_radius: float = lerp(0.0, captured_final_radius, eased_t)
+			var cur_pos: Vector2 = center + Vector2(cos(cur_angle), sin(cur_angle)) * cur_radius
+			captured_dot.position = cur_pos - Vector2(captured_size, captured_size) * 0.5
+			pos_history.pop_front()
+			pos_history.append(cur_pos)
+			if is_instance_valid(captured_tail):
+				captured_tail.visible = true
+				for p in range(8):
+					captured_tail.set_point_position(p, pos_history[p])
+				captured_tail.width = lerp(4.0, 1.5, eased_t)
+
+		var expand_tw: Tween = create_tween()
+		expand_tw.tween_method(expand_cb, 0.0, 1.0, expand_duration).set_trans(Tween.TRANS_LINEAR)
+		expand_tw.tween_callback(func() -> void:
+			orbit_angles[captured_i] = captured_final_angle
+		)
+
+	# expand 완료 대기 후 회전 부유
+	await get_tree().create_timer(1.0).timeout
+
+	var orbit_time: float = 0.0
+	var orbit_duration: float = 1.5
+	var orbit_speed: float = 0.2
+
+	while orbit_time < orbit_duration:
+		var dt: float = _last_delta
+		orbit_time += dt
+
+		for i in range(count):
+			if not is_instance_valid(dots[i]["node"]):
+				continue
+			orbit_angles[i] = orbit_angles[i] + orbit_speed * dt
+			var cur_pos: Vector2 = center + Vector2(cos(orbit_angles[i]), sin(orbit_angles[i])) * dots[i]["radius"]
+
+			var tail_ref: Line2D = tails[i]
+			for p in range(7):
+				tail_ref.set_point_position(p, tail_ref.get_point_position(p + 1))
+			tail_ref.set_point_position(7, cur_pos)
+
+			dots[i]["node"].position = cur_pos - Vector2(dots[i]["size"], dots[i]["size"]) * 0.5
+
+		await get_tree().process_frame
+
+	# === 페이즈 3: 흡수 + 노드 스케일 바운스 ===
+	var counter: RefCounted = RefCounted.new()
+	counter.set_meta("arrived", 0)
+	counter.set_meta("restore_done", false)
+
+	if _upgrade_scale_tween:
+		_upgrade_scale_tween.kill()
+	var scale_tween: Tween = create_tween()
+	scale_tween.tween_property(node, "scale", Vector2(1.5, 1.5), 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+	for i in range(count):
+		var dot_center_pos: Vector2 = dots[i]["node"].position + Vector2(dots[i]["size"], dots[i]["size"]) * 0.5
+		var captured_start: Vector2 = dot_center_pos
+		var captured_dot: Panel = dots[i]["node"]
+		var captured_tail: Line2D = tails[i]
+		var captured_size: float = dots[i]["size"]
+		var pos_history: Array = []
+		for _h in range(8):
+			pos_history.append(captured_start)
+
+		var delay: float = randf_range(0.0, 0.2)
+		var absorb_tw: Tween = create_tween()
+		absorb_tw.tween_interval(delay)
+		absorb_tw.tween_method(
+			func(t: float) -> void: _absorb_particle(captured_dot, captured_tail, captured_start, center, captured_size, pos_history, t),
+			0.0, 1.0, randf_range(0.4, 0.7)
+		).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_IN)
+
+		absorb_tw.tween_callback(func() -> void:
+			if is_instance_valid(captured_dot):
+				captured_dot.queue_free()
+			if is_instance_valid(captured_tail):
+				captured_tail.queue_free()
+			var n: int = counter.get_meta("arrived") + 1
+			counter.set_meta("arrived", n)
+			print("arrived:", n, "/", count)
+			if n >= count and not counter.get_meta("restore_done") and is_instance_valid(node):
+				counter.set_meta("restore_done", true)
+				print("복구 호출")
+				call_deferred("_restore_node_scale_and_wave", node, color)
+		)
+
+func _restore_node_scale_and_wave(node: Node2D, color: Color) -> void:
+	print("복구 시작 - 현재 scale:", node.scale)
+	if not is_instance_valid(node):
+		return
+	if _upgrade_scale_tween:
+		print("기존 트윈 kill")
+		_upgrade_scale_tween.kill()
+	_upgrade_scale_tween = create_tween()
+	_upgrade_scale_tween.tween_property(node, "scale", Vector2(1.0, 1.0), 0.4).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	_upgrade_scale_tween.tween_callback(func() -> void:
+		print("복구 완료 - 현재 scale:", node.scale)
+		_upgrade_scale_tween = null
+	)
+	_final_wave(node, color)
+
+func _absorb_particle(dot: Panel, tail: Line2D, start: Vector2, center: Vector2, size: float, pos_history: Array, t: float) -> void:
+	if not is_instance_valid(dot):
+		return
+	var cur_pos: Vector2 = start.lerp(center, t)
+	dot.position = cur_pos - Vector2(size, size) * 0.5
+	pos_history.pop_front()
+	pos_history.append(cur_pos)
+	if is_instance_valid(tail):
+		for p in range(8):
+			tail.set_point_position(p, pos_history[p])
+
+func _final_wave(node: Node2D, color: Color) -> void:
+	if not is_instance_valid(node):
+		return
+	var center: Vector2 = node.global_position
+
+	for r in range(2):
+		var wave: Panel = Panel.new()
+		var wsize: float = 80.0
+		wave.size = Vector2(wsize, wsize)
+		wave.position = center - Vector2(wsize, wsize) * 0.5
+		wave.pivot_offset = Vector2(wsize, wsize) * 0.5
+		var ws: StyleBoxFlat = StyleBoxFlat.new()
+		ws.set_corner_radius_all(int(wsize / 2))
+		ws.bg_color = Color(color.r, color.g, color.b, 0.0)
+		ws.border_color = Color(color.r, color.g, color.b, 0.6 - r * 0.2)
+		ws.set_border_width_all(2)
+		wave.add_theme_stylebox_override("panel", ws)
+		$EntityLayer.add_child(wave)
+
+		var wt: Tween = create_tween()
+		wt.set_parallel(true)
+		wt.tween_property(wave, "scale", Vector2(3.5, 3.5), 0.6).set_ease(Tween.EASE_OUT).set_delay(r * 0.1)
+		wt.tween_property(wave, "modulate", Color(1, 1, 1, 0), 0.5).set_ease(Tween.EASE_IN).set_delay(r * 0.1 + 0.1)
+		wt.tween_callback(wave.queue_free).set_delay(r * 0.1 + 0.6)
+
+func _update_blackhole_streak(
+	dot: Panel, streak: Line2D, dot_size: float,
+	start_pos: Vector2, center: Vector2, t: float
+) -> void:
+	if not is_instance_valid(dot):
+		return
+	# 단순 lerp - 좌표 변환 없이 글로벌 그대로
+	var pos: Vector2 = start_pos.lerp(center, t)
+	dot.position = pos - Vector2(dot_size, dot_size) * 0.5
+	streak.set_point_position(0, pos)
+	streak.set_point_position(1, start_pos)
+
+func _update_burst_shard_position(shard: Panel, shard_tail: Line2D, local_center: Vector2, local_end: Vector2, t: float) -> void:
+	var pos: Vector2 = local_center.lerp(local_end, t)
+	shard.position = pos - shard.size * 0.5
+	shard_tail.set_point_position(0, local_center)
+	shard_tail.set_point_position(1, pos)
+
+func _update_spark_position(spark: Panel, local_center: Vector2, local_end: Vector2, t: float) -> void:
+	spark.position = local_center.lerp(local_end, t) - Vector2(2, 2)
+
+func _burst_upgrade(node: Node2D, color: Color) -> void:
+	if not is_instance_valid(node):
+		return
+	if _upgrade_scale_tween:
+		_upgrade_scale_tween.kill()
+	var center: Vector2 = node.global_position
+	var current_scale: float = node.scale.x
+
+	# 순간 플래시 (팡 순간 빛남)
+	node.modulate = Color(1.4, 1.4, 1.4, 1.0)
+
+	var burst: Tween = create_tween()
+	burst.set_parallel(true)
+	burst.tween_property(node, "modulate", Color(1, 1, 1, 1), 0.15).set_delay(0.06).set_ease(Tween.EASE_OUT)
+	burst.tween_property(node, "scale", Vector2(current_scale * 1.25, current_scale * 1.25), 0.06).set_ease(Tween.EASE_OUT)
+
+	# 2겹 링 (안쪽 빠르게, 바깥 느리게)
+	for r in range(2):
+		var ring: Panel = Panel.new()
+		var ring_size: int = 50 + r * 40
+		ring.size = Vector2(ring_size, ring_size)
+		ring.position = center - Vector2(ring_size, ring_size) * 0.5
+		ring.pivot_offset = Vector2(ring_size, ring_size) * 0.5
+		ring.z_index = 48 + r
+		var rs: StyleBoxFlat = StyleBoxFlat.new()
+		rs.set_corner_radius_all(ring_size / 2)
+		rs.bg_color = Color(color.r, color.g, color.b, 0.12 - r * 0.04)
+		rs.border_color = Color(color.r, color.g, color.b, 0.95 - r * 0.2)
+		rs.set_border_width_all(4 - r)
+		ring.add_theme_stylebox_override("panel", rs)
+		$EntityLayer.add_child(ring)
+		var scale_tgt: float = 2.8 + r * 0.8
+		var ring_dur: float = 0.25 + r * 0.12
+		var ring_delay: float = r * 0.04
+		var ring_ref: Panel = ring
+		burst.tween_property(ring, "scale", Vector2(scale_tgt, scale_tgt), ring_dur).set_delay(ring_delay).set_ease(Tween.EASE_OUT)
+		burst.tween_property(ring, "modulate", Color(1, 1, 1, 0), ring_dur * 0.85).set_delay(ring_delay + 0.03).set_ease(Tween.EASE_IN)
+		get_tree().create_timer(ring_delay + ring_dur).timeout.connect(func() -> void:
+			if is_instance_valid(ring_ref):
+				ring_ref.queue_free()
+		)
+
+	# 스파크 12개 (작고 빠른 점)
+	for i in range(12):
+		var angle: float = (TAU / 12) * i + randf_range(-0.12, 0.12)
+		var dist: float = randf_range(50, 90)
+		var local_end: Vector2 = center + Vector2(cos(angle), sin(angle)) * dist
+		var spark: Panel = Panel.new()
+		spark.size = Vector2(4, 4)
+		spark.position = center - Vector2(2, 2)
+		spark.z_index = 46
+		var sp_s: StyleBoxFlat = StyleBoxFlat.new()
+		sp_s.set_corner_radius_all(2)
+		sp_s.bg_color = Color(color.r, color.g, color.b, 1.0)
+		spark.add_theme_stylebox_override("panel", sp_s)
+		$EntityLayer.add_child(spark)
+		var sp_dur: float = randf_range(0.12, 0.2)
+		var spark_ref: Panel = spark
+		burst.tween_method(
+			_update_spark_position.bind(spark, center, local_end),
+			0.0, 1.0, sp_dur
+		).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+		burst.tween_property(spark, "modulate", Color(color.r, color.g, color.b, 0), sp_dur).set_ease(Tween.EASE_IN)
+		get_tree().create_timer(sp_dur).timeout.connect(func() -> void:
+			if is_instance_valid(spark_ref):
+				spark_ref.queue_free()
+		)
+
+	# 방사형 입자 20개 (혜성 꼬리)
+	for i in range(20):
+		var angle: float = (TAU / 20) * i + randf_range(-0.1, 0.1)
+		var dist: float = randf_range(100, 180)
+		var local_end: Vector2 = center + Vector2(cos(angle), sin(angle)) * dist
+
+		var shard: Panel = Panel.new()
+		shard.size = Vector2(randf_range(8, 18), randf_range(8, 18))
+		shard.position = center - shard.size * 0.5
+		shard.z_index = 45
+		var ss: StyleBoxFlat = StyleBoxFlat.new()
+		ss.set_corner_radius_all(int(min(shard.size.x, shard.size.y) / 2))
+		ss.bg_color = Color(color.r, color.g, color.b, 0.95)
+		ss.border_color = Color(color.r, color.g, color.b, 0.5)
+		ss.set_border_width_all(1)
+		shard.add_theme_stylebox_override("panel", ss)
+		$EntityLayer.add_child(shard)
+
+		var shard_tail: Line2D = Line2D.new()
+		shard_tail.default_color = Color(color.r, color.g, color.b, 0.7)
+		shard_tail.width = randf_range(1.5, 2.5)
+		shard_tail.add_point(center)
+		shard_tail.add_point(center)
+		shard_tail.z_index = 44
+		$EntityLayer.add_child(shard_tail)
+
+		var dur: float = randf_range(0.28, 0.45)
+		var shard_ref: Panel = shard
+		var tail_ref: Line2D = shard_tail
+		burst.tween_method(
+			_update_burst_shard_position.bind(shard, shard_tail, center, local_end),
+			0.0, 1.0, dur
+		).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+		burst.tween_property(shard, "modulate", Color(color.r, color.g, color.b, 0), dur * 0.75).set_ease(Tween.EASE_IN)
+		burst.tween_property(shard_tail, "modulate", Color(1, 1, 1, 0), dur * 0.75).set_ease(Tween.EASE_IN)
+
+		get_tree().create_timer(dur).timeout.connect(func() -> void:
+			if is_instance_valid(shard_ref):
+				shard_ref.queue_free()
+			if is_instance_valid(tail_ref):
+				tail_ref.queue_free()
+		)
+
+	# 팡! 후 서서히 원상복구
+	burst.chain().tween_property(node, "scale", Vector2(1.0, 1.0), 0.65).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 
 func _recall_slots_to_panel() -> void:
 	print("회수 시점 _hint_area.position:", _hint_area.position)
@@ -1796,30 +2198,41 @@ func _on_special_changed(new_value: float) -> void:
 	var row: Control = $CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/ChipRow
 	row.modulate = Color(1, 1, 1, 0.5 if new_value <= 0 else 1.0)
 
-func _on_blood_tween_update(val: float) -> void:
+func _on_blood_counter_tween_update(val: float) -> void:
 	_displayed_blood = val
-	_blood_label.text = "🩸 " + str(int(val))
-	if _left_blood_label:
-		_left_blood_label.text = str(int(val))
+	if _blood_counter_ref and is_instance_valid(_blood_counter_ref):
+		_blood_counter_ref.text = "🩸 %d" % int(val)
+
+func _animate_blood_counter(amount: float, do_scale: bool) -> void:
+	if not _blood_counter_ref or not is_instance_valid(_blood_counter_ref):
+		return
+	if _blood_anim_tween:
+		_blood_anim_tween.kill()
+
+	_blood_counter_ref.pivot_offset = _blood_counter_ref.size / 2
+	_blood_anim_tween = create_tween()
+	_blood_anim_tween.set_parallel(true)
+	_blood_anim_tween.tween_method(
+		_on_blood_counter_tween_update, _displayed_blood, amount, 0.35
+	).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	if do_scale:
+		_blood_anim_tween.tween_property(
+			_blood_counter_ref, "scale", Vector2(1.3, 1.3), 0.15
+		).set_ease(Tween.EASE_OUT)
+	_blood_anim_tween.set_parallel(false)
+	if do_scale:
+		_blood_anim_tween.tween_property(
+			_blood_counter_ref, "scale", Vector2(1.0, 1.0), 0.2
+		).set_ease(Tween.EASE_IN).set_delay(0.15)
 
 func update_blood_ui(amount: float) -> void:
-	_blood_label.visible = false  # 우상단 숨김, 중앙 하단 BloodCounter 메인 사용
-	if _blood_tween:
-		_blood_tween.kill()
-
-	_blood_label.pivot_offset = _blood_label.size / 2
-
-	_blood_tween = create_tween()
-	_blood_tween.set_parallel(true)
-	_blood_tween.tween_method(_on_blood_tween_update, _displayed_blood, amount, 0.4)\
-		.set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-	_blood_tween.tween_property(
-		_blood_label, "scale", Vector2(1.25, 1.25), 0.1
-	).set_ease(Tween.EASE_OUT)
-	_blood_tween.set_parallel(false)
-	_blood_tween.tween_property(
-		_blood_label, "scale", Vector2(1.0, 1.0), 0.2
-	).set_ease(Tween.EASE_IN).set_delay(0.3)
+	_blood_label.visible = false
+	var diff: float = abs(amount - _last_blood_value) if _last_blood_value >= 0 else 0.0
+	var do_scale: bool = diff >= 5.0
+	_last_blood_value = amount
+	_animate_blood_counter(amount, do_scale)
+	if _left_blood_label:
+		_left_blood_label.text = str(int(amount))
 
 func _update_slot_count_label() -> void:
 	var used: int = get_tree().get_nodes_in_group("game_nodes").size()
