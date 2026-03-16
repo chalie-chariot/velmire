@@ -1,8 +1,12 @@
 extends Node2D
 
+const EFFECT_NAME := "orbit"
+
+var orbit_color: Color = Color(1.0, 0.15, 0.15)  # 외부에서 설정 가능
 var _time: float = 0.0
 var _alpha: float = 1.0
-var _speed: float = 6.0
+var _speed: float = 12.0  # 시작 속도
+var _speed_decay: float = 4.0  # 감속 강도
 
 # 3개 궤도 - 각각 다른 기울기
 var _orbits: Array = [
@@ -14,13 +18,17 @@ var _orbits: Array = [
 var _radius_x: float = 55.0
 var _radius_y: float = 22.0
 
+func _ready() -> void:
+	for orbit in _orbits:
+		orbit.color = orbit_color
+
 func _process(delta: float) -> void:
 	_time += delta
-	# 감속
-	_speed = max(_speed - 1.5 * delta, 0.3)
-	# 페이드아웃
-	_alpha -= 0.35 * delta
-	if _alpha <= 0:
+	# 점점 감속 (0에 수렴)
+	_speed = max(_speed - _speed_decay * delta, 0.0)
+	# 거의 0에 다다를 때 페이드아웃
+	_alpha = clamp(_speed / 1.5, 0.0, 1.0) if _speed < 1.5 else 1.0
+	if _speed <= 0.01:
 		queue_free()
 		return
 	# 각도 업데이트
@@ -70,10 +78,8 @@ func _draw() -> void:
 				max(tail_size, 0.5),
 				Color(color.r, color.g, color.b, tail_alpha * 0.6))
 
-		# 전자 본체
+		# 전자 본체 (단색)
 		draw_circle(electron_pos, 5.5,
-			Color(color.r * 0.5, color.g * 0.5, color.b * 0.5, _alpha))
+			Color(color.r, color.g, color.b, _alpha * 0.8))
 		draw_circle(electron_pos, 3.5,
 			Color(color.r, color.g, color.b, _alpha))
-		draw_circle(electron_pos, 1.5,
-			Color(1.0, 1.0, 1.0, _alpha * 0.9))

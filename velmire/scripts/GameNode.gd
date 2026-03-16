@@ -36,6 +36,15 @@ var _mouse_down_for_click: bool = false
 var _mouse_down_pos: Vector2 = Vector2.ZERO
 var is_preview: bool = false
 var spawn_cost: int = 0  # 드롭 시 재화 소모 (0이면 이미 소유)
+var _orbit_shown: bool = false  # 필드 첫 배치 시 1회만 orbit
+
+# 강화
+var upgrade_level: int = 0
+var max_upgrade: int = 3  # 특수 노드는 2로 설정
+var base_damage: float = 25.0  # 흡혈용
+var slow_amount: float = 0.5  # 결계용
+var slow_duration: float = 3.0  # 결계용
+var cooldown_reduction: float = 0.3  # 증폭용 (30% → 1 - 0.3 = 0.7 배율)
 
 const _DRAG_THRESHOLD: float = 10.0
 var _drag_start_pos: Vector2 = Vector2.ZERO
@@ -282,17 +291,6 @@ func _draw() -> void:
 			alpha = 0.8 * (_range_fade_timer / _range_fade_duration)
 		draw_arc(Vector2.ZERO, range_val, 0, TAU, 128,
 			Color(node_color.r, node_color.g, node_color.b, alpha), 1.5)
-		# 선택 순서 번호 (페이드 중이면 표시 안 함)
-		if is_selected:
-			var main = get_tree().get_first_node_in_group("main")
-			if main:
-				var idx: int = main._selected_nodes.find(self)
-				if idx >= 0:
-					var font: Font = ThemeDB.fallback_font
-					draw_string(font, Vector2(radius + 8, -radius),
-						str(idx + 1),
-						HORIZONTAL_ALIGNMENT_LEFT, -1, 14,
-						Color(node_color.r, node_color.g, node_color.b, 0.9))
 
 	# 2. SHIFT 연결 범위 (_is_first_selected - 400 그라데이션)
 	if _is_first_selected and is_placed:
@@ -466,6 +464,10 @@ func _try_place_on_grid() -> void:
 		if spawn_cost > 0 and ResourceManager:
 			ResourceManager.spend_blood(spawn_cost)
 			spawn_cost = 0
+		main = get_tree().get_first_node_in_group("main")
+		if main and main.has_method("_play_orbit_effect_at_pos") and not _orbit_shown:
+			main._play_orbit_effect_at_pos(global_position, node_color)
+			_orbit_shown = true
 		var cm = get_tree().get_first_node_in_group("connection_manager")
 		if cm and cm.has_method("set_last_placed"):
 			cm.set_last_placed(self)
@@ -481,7 +483,7 @@ func _do_attack() -> bool:
 	match node_type:
 		"흡혈":
 			var diff: int = ResourceManager.difficulty if ResourceManager else 0
-			var damage: float = 25.0 + diff * 10.0
+			var damage: float = base_damage + diff * 10.0
 			return _attack_nearest_entity(damage)
 		"결계":
 			return _slow_nearest_entity()
@@ -525,10 +527,10 @@ func _attack_nearest_entity(damage: float) -> bool:
 
 func _slow_nearest_entity() -> bool:
 	var slow_range: float = 200.0
-	var slow_duration: float = 3.0
+	var eff_duration: float = slow_duration
 	if synergy_wide_slow:
 		slow_range *= 2.0
-		slow_duration *= 2.0
+		eff_duration *= 2.0
 
 	var hit_any: bool = false
 	var entities = get_tree().get_nodes_in_group("blood_entities")
@@ -536,19 +538,20 @@ func _slow_nearest_entity() -> bool:
 		if global_position.distance_to(e.global_position) <= slow_range:
 			if e.has_method("apply_slow"):
 				_spawn_attack_line(e.global_position)
-				e.apply_slow(0.5, slow_duration)
+				e.apply_slow(slow_amount, eff_duration)
 				hit_any = true
 	return hit_any
 
 func _boost_adjacent_nodes() -> bool:
 	var nodes = get_tree().get_nodes_in_group("game_nodes")
 	var boosted_any: bool = false
+	var factor: float = 1.0 - cooldown_reduction
 	for n in nodes:
 		if n == self:
 			continue
 		var d: float = global_position.distance_to(n.global_position)
 		if d < 120.0:
-			n.attack_cooldown = attack_cooldown * 0.7
+			n.attack_cooldown = attack_cooldown * factor
 			boosted_any = true
 	return boosted_any
 
