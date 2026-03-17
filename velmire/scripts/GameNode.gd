@@ -119,6 +119,9 @@ func _update_range_indicator(show: bool) -> void:
 	_range_indicator = indicator
 
 func _start_drag() -> void:
+	var main = get_tree().get_first_node_in_group("main")
+	if main and main.has_method("_close_node_info_panel"):
+		main._close_node_info_panel()
 	_is_being_dragged = true
 	cancel_removal_countdown()
 	_out_of_range = false
@@ -226,9 +229,11 @@ func _input(event: InputEvent) -> void:
 					main.clear_all_node_selection()
 				_range_fade_timer = -1.0  # 드래그 시 페이드 취소
 				get_viewport().set_input_as_handled()
-			elif _mouse_down_for_click and is_hover and _is_topmost_hovered():
-				# 클릭만 했을 때 → 다중 선택 (최대 3개)
+			elif _mouse_down_for_click and is_hover and _is_topmost_hovered() and not is_dragging:
+				# 클릭만 했을 때 → 정보창 호출 + 다중 선택 (최대 3개)
 				var main = get_tree().get_first_node_in_group("main")
+				if main and main.has_method("show_node_info"):
+					main.show_node_info(self)
 				if main and main.has_method("register_node_select"):
 					main.register_node_select(self)
 				_mouse_down_for_click = false

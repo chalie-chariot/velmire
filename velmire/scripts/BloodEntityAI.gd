@@ -122,14 +122,17 @@ func _spawn_death_effect() -> void:
 
 func _drop_blood() -> void:
 	var drop_scene = preload("res://scenes/BloodDrop.tscn")
-	var drop_value: float = max(1.0, max_hp / 60.0)
-	var coffin_center = get_tree().get_first_node_in_group("coffin")
-	if not coffin_center:
+	var coffin = get_tree().get_first_node_in_group("coffin")
+	if not coffin:
 		return
-	var target: Vector2 = coffin_center.global_position + coffin_center.size / 2
+	var target: Vector2 = coffin.global_position + coffin.size / 2
+	var dist: float = global_position.distance_to(target)
+	var kill_in_coffin_range: bool = dist <= 250.0
+
+	var drop_value: float = max(1.0, max_hp / 60.0)
 	var drop = drop_scene.instantiate()
 	get_parent().add_child(drop)
-	drop.setup(global_position, drop_value, target)
+	drop.setup(global_position, drop_value, target, false, kill_in_coffin_range)
 
 func _spawn_damage_number(amount: float) -> void:
 	var label: Label = Label.new()

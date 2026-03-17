@@ -7,7 +7,7 @@ var level: int = 1             # 현재 레벨 (1~3)
 var accumulated: int = 0       # 현재 누적 루비
 var is_producing: bool = false
 
-# 탭 인덱스별 스탯 테이블 (interval 테스트용 3.0)
+# 탭 인덱스별 스탯 테이블
 const TAP_STATS = {
 	1: {"interval": 3.0, "cap": 5,  "chip_chance": 0.0},
 	2: {"interval": 3.0, "cap": 8,  "chip_chance": 0.01},
@@ -196,9 +196,6 @@ func _get_q_tab_target_screen_pos() -> Vector2:
 		var blood_icon = main.get_node("CanvasLayer/LeftTab/Icon1")
 		target_pos = blood_icon\
 			.get_global_transform_with_canvas().origin + Vector2(15, 0)
-
-	print("Q탭 열림: ", q_open)
-	print("target_pos: ", target_pos)
 
 	return target_pos
 

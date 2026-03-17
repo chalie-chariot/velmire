@@ -20,7 +20,6 @@ var _node_grid: Node = null
 
 
 func _ready() -> void:
-	print("AutoAbsorb 시작")
 	_setup_timer()
 	call_deferred("_connect_signals")
 

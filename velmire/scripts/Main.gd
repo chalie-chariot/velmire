@@ -69,13 +69,64 @@ var _unlocked_slots: int = 3  # 초기 3개
 var _max_slots: int = 6       # 최대 6개
 const _num_node_type_slots: int = 3  # 구매 가능 노드 종류 수 (흡혈/결계/증폭) — 그 외는 빈 슬롯
 const _slot_unlock_costs: Array = [20, 33, 45]  # 슬롯 4·5·6 해금 비용
+
+const TOOLTIP_BLOOD = {
+	"title": "🩸 혈액",
+	"desc": "런 내 기본 재화. 런 종료 시 초기화됩니다.",
+	"details": [
+		"노드 소환 / 슬롯 해금 / 노드 강화에 사용",
+		"관 범위 안에서 처치 시 +3 + 기본량의 50% 보너스",
+		"시청자 100명: 혈액 2배 10초",
+		"시청자 500명: 혈액 2배 20초",
+		"시청자 1000명+: 혈액 2배 30초",
+	]
+}
+
+const TOOLTIP_RUBY = {
+	"title": "🔴 루비 (블러디아 루비)",
+	"desc": "영속 이월 재화. 런이 끝나도 유지됩니다.",
+	"details": [
+		"15콤보 달성  →  +1",
+		"퍼펙트 디펜스 (30초 무피격, HP 100%)  →  +1",
+		"클리어 (2분 제한, 관 HP 유지)  →  +3",
+		"RubinaTap 자동 생산  →  +1~수량 (cap 5~18)",
+		"후원 소액  →  +1 / 중액  →  +2 / 고액  →  +3",
+		"슈퍼챗  →  50% 확률",
+	]
+}
+
+const TOOLTIP_CHIP = {
+	"title": "◆ 블러디아 칩",
+	"desc": "보류",
+	"details": []
+}
+
+const TOOLTIP_RINGLIGHT = {
+	"title": "💡 링라이트",
+	"desc": "루비 2개로 배치. 60초 유지, 범위 300px.",
+	"details": [
+		"관·링라이트 범위 내 노드 배치 가능",
+		"HeartPulse가 범위 내 노드에 랜덤 버프 적용",
+		"버프: 쿨다운 / 데미지 / 범위 / 혈액 (10초 쿨)",
+	]
+}
+
+const TOOLTIP_RUBINA_TAP = {
+	"title": "🔴 루비나 탭",
+	"desc": "주기적으로 루비를 생산하는 시설.",
+	"details": [
+		"일정 간격(3초)마다 cap 수만큼 루비 생성",
+		"탭 인덱스별 cap 5~18, 칩 확률 0~5%",
+		"누적 시 아이콘 부유 → 클릭 시 UI로 흡수",
+	]
+}
+
 var _hint_hiding: bool = false
 var _hint_hide_tweens: Array = []
 var _unlock_animation_playing: bool = false  # 해금 애니 중엔 인디케이터 숨기지 않음
 var _indicator_was_hidden: bool = true
 var _pending_spawn_index: int = -1  # 재화 차감됐지만 아직 스폰 안된 슬롯 (중복 방지)
 var _slots_in_panel: bool = false  # X키로 슬롯이 Q 패널로 회수된 상태
-var _debug_slot_pos_printed: bool = false  # P키 디버그 1프레임만
 var _slot_data: Array[String] = ["", "", "", "", "", ""]  # 6개 인디케이터 슬롯
 var _selected_nodes: Array = []
 var _combo_count: int = 0
@@ -99,7 +150,7 @@ var _hitstop_timer: float = 0.0
 # 단계 5 (150s+):   스폰간격 2.25s / 최대 9개 / HP 160 / 속도 80 / radius 37
 # ==========================================
 var _elapsed_time: float = 0.0
-var _round_time: float = 120.0  # 테스트용 2분
+var _round_time: float = 120.0
 var _remaining_time: float = 120.0
 var _viewers: int = 0
 var _likes: int = 0
@@ -113,11 +164,15 @@ var _state_timer: float = 0.0
 var _no_hit_timer: float = 0.0
 var _perfect_defense_notified: bool = false
 var _map_vignette_overlay: ColorRect = null
+var _tooltip_node: Control = null
+var _tooltip_tween: Tween = null
+var _node_info_panel: Control = null
+const _tooltip_width: float = 690.0
+const _tooltip_height: float = 180.0
 
 func _ready() -> void:
 	add_to_group("main")
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	print("Main 시작")
 	var coffin_center: Vector2 = _coffin_rect.position + _coffin_rect.size / 2
 	$EntityLayer/HeartPulse.setup(coffin_center)
 	var coffin_particles: Node2D = Node2D.new()
@@ -153,6 +208,25 @@ func _ready() -> void:
 	_on_chip_changed(ResourceManager.chip)
 	_init_viewers()
 	update_ruby_ui(ResourceManager.ruby)
+
+	var blood_row: Control = $CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/BloodRow
+	var ruby_row: Control = $CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/RubyRow
+	var chip_row: Control = $CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/ChipRow
+	var rubina_tap_card: Control = $CanvasLayer/LeftPanel.get_node_or_null("Card2_Automation")
+	blood_row.mouse_filter = Control.MOUSE_FILTER_STOP
+	ruby_row.mouse_filter = Control.MOUSE_FILTER_STOP
+	chip_row.mouse_filter = Control.MOUSE_FILTER_STOP
+	if rubina_tap_card:
+		rubina_tap_card.mouse_filter = Control.MOUSE_FILTER_STOP
+		rubina_tap_card.mouse_entered.connect(_on_rubina_tap_card_mouse_entered)
+		rubina_tap_card.mouse_exited.connect(_on_resource_tooltip_exited)
+	blood_row.mouse_entered.connect(_on_blood_row_mouse_entered)
+	blood_row.mouse_exited.connect(_on_resource_tooltip_exited)
+	ruby_row.mouse_entered.connect(_on_ruby_row_mouse_entered)
+	ruby_row.mouse_exited.connect(_on_resource_tooltip_exited)
+	chip_row.mouse_entered.connect(_on_chip_row_mouse_entered)
+	chip_row.mouse_exited.connect(_on_resource_tooltip_exited)
+
 	var viewer_bar: Control = $CanvasLayer/RightPanel/ViewerBar
 	var right_panel: Control = $CanvasLayer/RightPanel
 	viewer_bar.position = Vector2(0, right_panel.size.y - 40)
@@ -254,18 +328,291 @@ func show_tooltip(info: Dictionary, node_color: Color, node: Node2D = null) -> v
 	_tip_syn2.text = "◆ " + info.synergy2
 	_stat_atk.text = "⚔ 공격력: " + str(info.atk)
 	_stat_cd.text = "⏱ 쿨다운: " + str(info.cooldown) + "s"
+	_tip_name.add_theme_font_size_override("font_size", 24)
+	_tip_desc.add_theme_font_size_override("font_size", 18)
+	_tip_syn1.add_theme_font_size_override("font_size", 18)
+	_tip_syn2.add_theme_font_size_override("font_size", 18)
+	_stat_atk.add_theme_font_size_override("font_size", 18)
+	_stat_cd.add_theme_font_size_override("font_size", 18)
 	_tip_syn1.add_theme_color_override("font_color", node_color.lightened(0.3))
 	_tip_syn2.add_theme_color_override("font_color", node_color.lightened(0.3))
+
+	# 관 기준 좌/우에 따라 하단 설명창 위치 결정 (고정 위치로 정확히 배치)
+	var viewport_width: float = get_viewport_rect().size.x
+	var viewport_height: float = get_viewport_rect().size.y
+	var bar_bottom: float = viewport_height
+	var bar_top: float = bar_bottom - _tooltip_height
+	var bar_width: float = _tooltip_width
+
+	var coffin_center_x: float = _coffin_rect.global_position.x + _coffin_rect.size.x / 2.0
+	var is_left: bool = true
+	if node:
+		is_left = node.global_position.x < coffin_center_x
+
+	if _tooltip_tween:
+		_tooltip_tween.kill()
+
+	# 하단 고정: y=900~1080, 가로는 관 기준 좌/우 (왼쪽 210~900, 오른쪽 1230~1920)
+	if is_left:
+		_tooltip.offset_left = 210.0
+		_tooltip.offset_right = 210.0 + bar_width
+		_tooltip.offset_top = bar_top
+		_tooltip.offset_bottom = bar_bottom
+	else:
+		_tooltip.offset_left = viewport_width - bar_width - 10.0
+		_tooltip.offset_right = viewport_width - 10.0
+		_tooltip.offset_top = bar_top
+		_tooltip.offset_bottom = bar_bottom
+
+	_tooltip.z_index = 200
+	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tooltip.color = Color(0.05, 0, 0, 1.0)  # 완전 불투명 배경
+	_tooltip.modulate = Color(1, 1, 1, 1)
 	_tooltip.visible = true
 
 func hide_tooltip() -> void:
+	if _tooltip_tween:
+		_tooltip_tween.kill()
+		_tooltip_tween = null
 	_tooltip.visible = false
+
+func _hide_tooltip() -> void:
+	if _tooltip_node and is_instance_valid(_tooltip_node):
+		_tooltip_node.queue_free()
+	_tooltip_node = null
+
+func show_node_info(node: Node) -> void:
+	if _node_info_panel and is_instance_valid(_node_info_panel):
+		_node_info_panel.queue_free()
+		_node_info_panel = null
+
+	var canvas_layer = $CanvasLayer
+	var panel = PanelContainer.new()
+	panel.z_index = 200
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	var node_screen_pos = node.get_global_transform_with_canvas().origin
+	var viewport_size = get_viewport_rect().size
+	var panel_x = node_screen_pos.x + 40
+	var panel_y = node_screen_pos.y - 60
+	panel_x = clampf(panel_x, 10.0, viewport_size.x - 230.0)
+	panel_y = clampf(panel_y, 10.0, viewport_size.y - 200.0)
+	panel.position = Vector2(panel_x, panel_y)
+	panel.custom_minimum_size = Vector2(220, 0)
+
+	var node_color: Color = node.node_color if node.get("node_color") else Color(0.6, 0.1, 0.1, 1.0)
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.06, 0.0, 0.01, 0.95)
+	style.border_color = node_color
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 10
+	style.content_margin_bottom = 10
+	panel.add_theme_stylebox_override("panel", style)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	panel.add_child(vbox)
+
+	var name_label = Label.new()
+	name_label.text = node.node_type if node.get("node_type") else node.name
+	name_label.add_theme_font_size_override("font_size", 16)
+	name_label.modulate = node_color
+	vbox.add_child(name_label)
+
+	var sep = HSeparator.new()
+	sep.modulate = Color(0.4, 0.1, 0.1, 1.0)
+	vbox.add_child(sep)
+
+	var stats = _build_node_stats(node)
+	for stat in stats:
+		var row = Label.new()
+		row.text = stat
+		row.add_theme_font_size_override("font_size", 13)
+		row.modulate = Color(0.85, 0.85, 0.85, 1.0)
+		vbox.add_child(row)
+
+	if node.get("upgrade_level") != null:
+		var sep2 = HSeparator.new()
+		sep2.modulate = Color(0.4, 0.1, 0.1, 1.0)
+		vbox.add_child(sep2)
+		var lv_label = Label.new()
+		lv_label.text = "Lv." + str(node.upgrade_level + 1)
+		lv_label.add_theme_font_size_override("font_size", 12)
+		lv_label.modulate = Color(0.7, 0.7, 0.7, 1.0)
+		vbox.add_child(lv_label)
+
+	canvas_layer.add_child(panel)
+	_node_info_panel = panel
+
+	panel.modulate = Color(1, 1, 1, 0)
+	var tw = create_tween()
+	tw.tween_property(panel, "modulate:a", 1.0, 0.15).set_ease(Tween.EASE_OUT)
+
+func _build_node_stats(node: Node) -> Array:
+	var stats: Array = []
+	var type = node.get("node_type")
+
+	match type:
+		"흡혈":
+			var diff: int = ResourceManager.difficulty if ResourceManager else 0
+			var base: float = node.base_damage if node.get("base_damage") else 25.0
+			var dmg: float = base + diff * 10.0
+			stats.append("⚔ 데미지: " + str(int(dmg)))
+			stats.append("📏 범위: 200px")
+			var cd: float = node._get_effective_cooldown() if node.has_method("_get_effective_cooldown") else (node.attack_cooldown if node.get("attack_cooldown") else 2.0)
+			stats.append("⏱ 쿨다운: %.1f초" % cd)
+		"결계":
+			stats.append("🔵 감속: 50%")
+			stats.append("📏 범위: 200px")
+			stats.append("⏱ 지속: 3.0초")
+			stats.append("⏱ 쿨다운: %.1f초" % (node.attack_cooldown if node.get("attack_cooldown") else 4.0))
+		"증폭":
+			stats.append("⚡ 쿨다운 감소: 30%")
+			stats.append("📏 범위: 120px")
+			stats.append("⏱ 쿨다운: %.1f초" % (node.attack_cooldown if node.get("attack_cooldown") else 2.0))
+		_:
+			if node.get("base_damage") and node.base_damage > 0:
+				stats.append("⚔ 데미지: " + str(int(node.base_damage)))
+			if node.get("base_range"):
+				stats.append("📏 범위: " + str(node.base_range) + "px")
+			elif node.has_method("_get_ability_range"):
+				stats.append("📏 범위: " + str(int(node._get_ability_range())) + "px")
+			if node.get("base_cooldown"):
+				stats.append("⏱ 쿨다운: " + str(node.base_cooldown) + "초")
+			elif node.get("attack_cooldown"):
+				stats.append("⏱ 쿨다운: %.1f초" % node.attack_cooldown)
+
+	if node.get("_buff_damage_mult") and node._buff_damage_mult > 1.0:
+		stats.append("🔥 데미지 버프 활성 중")
+	if node.get("_buff_cooldown_mult") and node._buff_cooldown_mult < 1.0:
+		stats.append("⚡ 쿨다운 버프 활성 중")
+
+	return stats
+
+func _close_node_info_panel() -> void:
+	if not _node_info_panel or not is_instance_valid(_node_info_panel):
+		return
+	var panel_ref = _node_info_panel
+	_node_info_panel = null
+	var tw = create_tween()
+	tw.tween_property(panel_ref, "modulate:a", 0.0, 0.12)
+	tw.tween_callback(func():
+		if is_instance_valid(panel_ref):
+			panel_ref.queue_free()
+	)
+
+func _show_tooltip(data: Dictionary, anchor_pos: Vector2) -> void:
+	_hide_tooltip()
+
+	var canvas_layer = $CanvasLayer
+	var box = PanelContainer.new()
+	box.z_index = 200
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.06, 0.0, 0.02, 0.92)
+	style.border_color = Color(0.6, 0.1, 0.15, 1.0)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(4)
+	style.set_content_margin_all(14)
+	box.add_theme_stylebox_override("panel", style)
+
+	var vbox = VBoxContainer.new()
+	box.add_child(vbox)
+
+	var title = Label.new()
+	title.text = data["title"]
+	title.add_theme_font_size_override("font_size", 20)
+	title.modulate = Color(1.0, 0.85, 0.85, 1.0)
+	vbox.add_child(title)
+
+	var sep = HSeparator.new()
+	sep.modulate = Color(0.5, 0.1, 0.1, 1.0)
+	vbox.add_child(sep)
+
+	var desc = Label.new()
+	desc.text = data["desc"]
+	desc.add_theme_font_size_override("font_size", 16)
+	desc.modulate = Color(0.8, 0.8, 0.8, 1.0)
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD
+	desc.custom_minimum_size = Vector2(300, 0)
+	vbox.add_child(desc)
+
+	for detail in data["details"]:
+		var row = Label.new()
+		row.text = "• " + detail
+		row.add_theme_font_size_override("font_size", 15)
+		row.modulate = Color(0.75, 0.75, 0.75, 1.0)
+		row.autowrap_mode = TextServer.AUTOWRAP_WORD
+		row.custom_minimum_size = Vector2(300, 0)
+		vbox.add_child(row)
+
+	canvas_layer.add_child(box)
+	_tooltip_node = box
+
+	await get_tree().process_frame
+	if not is_instance_valid(box):
+		return
+	var tsize = box.size
+	# Q탭 우측 라인(LeftPanel 열림 시 x=40, 너비 220 → 우측 260)에 쫙 붙임
+	var left_panel = $CanvasLayer/LeftPanel
+	var panel_right: float = 260.0
+	if left_panel:
+		var panel_rect = left_panel.get_global_rect()
+		panel_right = panel_rect.position.x + panel_rect.size.x
+	var tx = max(panel_right, 10.0)
+	if tx + tsize.x > 1920.0 - 10.0:
+		tx = 1920.0 - tsize.x - 10.0
+	var ty = clamp(anchor_pos.y - tsize.y - 8.0, 10.0, 1080.0 - tsize.y - 10.0)
+	box.position = Vector2(tx, ty)
+
+	box.modulate = Color(1, 1, 1, 0)
+	var tw = create_tween()
+	tw.tween_property(box, "modulate:a", 1.0, 0.15).set_ease(Tween.EASE_OUT)
+
+func _on_blood_row_mouse_entered() -> void:
+	var row: Control = $CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/BloodRow
+	var rect = row.get_global_rect()
+	var anchor = rect.position + Vector2(rect.size.x / 2, rect.size.y)
+	_show_tooltip(TOOLTIP_BLOOD, anchor)
+
+func _on_ruby_row_mouse_entered() -> void:
+	var row: Control = $CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/RubyRow
+	var rect = row.get_global_rect()
+	var anchor = rect.position + Vector2(rect.size.x / 2, rect.size.y)
+	_show_tooltip(TOOLTIP_RUBY, anchor)
+
+func _on_chip_row_mouse_entered() -> void:
+	var row: Control = $CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/ChipRow
+	var rect = row.get_global_rect()
+	var anchor = rect.position + Vector2(rect.size.x / 2, rect.size.y)
+	_show_tooltip(TOOLTIP_CHIP, anchor)
+
+func _on_ring_light_card_mouse_entered() -> void:
+	var card: Control = $CanvasLayer/LeftPanel.get_node_or_null("RingLightCard")
+	if card:
+		var rect = card.get_global_rect()
+		var anchor = rect.position + Vector2(rect.size.x / 2, rect.size.y)
+		_show_tooltip(TOOLTIP_RINGLIGHT, anchor)
+
+func _on_rubina_tap_card_mouse_entered() -> void:
+	var card: Control = $CanvasLayer/LeftPanel.get_node_or_null("Card2_Automation")
+	if card:
+		var rect = card.get_global_rect()
+		var anchor = rect.position + Vector2(rect.size.x / 2, rect.size.y)
+		_show_tooltip(TOOLTIP_RUBINA_TAP, anchor)
+
+func _on_resource_tooltip_exited() -> void:
+	_hide_tooltip()
 
 func get_coffin_hp_ratio() -> float:
 	return float(coffin_hp) / float(coffin_max_hp) if coffin_max_hp > 0 else 1.0
 
 func _spawn_start_nodes() -> void:
-	# 기본 노드 3종 (흡혈/결계/증폭) 배치
+	# 기본 노드: 흡혈 1개, 결계 1개 배치
 	var node_scene = preload("res://scenes/GameNode.tscn")
 	var grid = $EntityLayer/HeartPulse
 	var coffin_center: Vector2 = _coffin_rect.position + _coffin_rect.size / 2
@@ -282,7 +629,7 @@ func _spawn_start_nodes() -> void:
 		node.node_type = data.type
 		node.node_color = data.color
 		node.is_starter_node = true
-		var offset_x: float = -120.0 if i == 0 else 120.0  # 좌(-120), 우(120)
+		var offset_x: float = -120.0 if i == 0 else 120.0
 		var pos: Vector2 = Vector2(coffin_center.x + offset_x, coffin_center.y)
 		node.global_position = pos
 		node._slot_position = pos
@@ -294,17 +641,6 @@ func _spawn_start_nodes() -> void:
 			node.grid_row = cell.y
 			node._orbit_shown = true
 		$EntityLayer.add_child(node)
-
-	# RubinaTap 1개 배치
-	var rubina_scene = load("res://scenes/RubinaTap.tscn")
-	if rubina_scene != null:
-		var tap = rubina_scene.instantiate()
-		get_tree().current_scene.add_child(tap)
-		var coffins = get_tree().get_nodes_in_group("coffin")
-		if coffins.size() > 0:
-			tap.position = coffins[0].global_position + Vector2(-200, 0)
-		else:
-			tap.position = Vector2(720, 480)
 
 func _build_hint_dots() -> void:
 	# 기존 자식 전부 제거
@@ -660,6 +996,8 @@ func _build_owned_nodes() -> void:
 		ring_btn.offset_right = -4
 		ring_btn.offset_bottom = -4
 		ring_card.add_child(ring_btn)
+		ring_btn.mouse_entered.connect(_on_ring_light_card_mouse_entered)
+		ring_btn.mouse_exited.connect(_on_resource_tooltip_exited)
 	else:
 		_owned_container.add_child(ring_btn)
 
@@ -1145,19 +1483,6 @@ func _show_combo_popup(count: int, multiplier: float) -> void:
 
 func _process(delta: float) -> void:
 	_last_delta = delta
-	if Input.is_key_pressed(KEY_P):
-		if not _debug_slot_pos_printed:
-			_debug_slot_pos_printed = true
-			print("_dots_container position:", _dots_container.position)
-			print("슬롯0 global_position:", _dots_container.get_children()[0].global_position)
-			for child in _dots_container.get_children():
-				if child is Panel:
-					print("슬롯 position:", child.position)
-					print("슬롯 부모 position:", _dots_container.position)
-					print("_hint_area position:", _hint_area.position)
-	else:
-		_debug_slot_pos_printed = false
-
 	if _hitstop_timer > 0:
 		_hitstop_timer -= delta / Engine.time_scale  # 실제 시간 기준 감소
 		Engine.time_scale = 0.05
@@ -1776,17 +2101,13 @@ func _escape_success() -> void:
 	$CanvasLayer.add_child(label4)
 
 func _input(event: InputEvent) -> void:
-	# 관( coffin ) 클릭: 루비 1개 소비 → HP +25
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and not _is_game_over:
-		var coffin_rect2: Rect2 = Rect2(_coffin_rect.global_position, _coffin_rect.size)
-		if coffin_rect2.has_point(get_viewport().get_mouse_position()):
-			if ResourceManager.spend_ruby(1):
-				heal_coffin(25.0)
-				_show_ruby_popup("💊 HP +25")
-			else:
-				_show_ruby_popup("루비 부족! 🔴")
-			get_viewport().set_input_as_handled()
-			return
+	# 좌클릭: 노드 정보 패널 밖 클릭 시 닫기
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if _node_info_panel and is_instance_valid(_node_info_panel):
+			var panel_rect = _node_info_panel.get_global_rect()
+			var mouse_pos = get_viewport().get_mouse_position()
+			if not panel_rect.has_point(mouse_pos):
+				_close_node_info_panel()
 
 	# 우클릭: 시너지 연결 대기 중이면 취소, 아니면 노드 제거 (_input에서 처리해 GUI보다 먼저)
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:

@@ -5,7 +5,7 @@ signal blood_changed(new_value: int)
 signal special_changed(new_value: float)
 signal chip_changed(new_value: int)
 
-var blood: int = 50  # 테스트용 초기값
+var blood: int = 0
 var special: float = 0.0
 var node_fragments: int = 0
 var difficulty: int = 0  # 0단계부터 시작
@@ -15,7 +15,7 @@ var total_runs: int = 0
 var total_kills: int = 0
 var best_viewers: int = 0
 
-var ruby: int = 100  # 블러디아 루비 (테스트용 초기값)
+var ruby: int = 0
 var chip: int = 0    # 블러디아 칩
 
 
@@ -42,7 +42,6 @@ func add_chip(amount: int) -> void:
 
 
 func _ready() -> void:
-	print("ResourceManager 시작")
 	pass
 
 

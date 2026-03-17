@@ -485,7 +485,7 @@ offset_right = 200.0
 offset_bottom = 24.0
 theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
 theme_override_font_sizes/font_size = 13
-text = "⚡ 자동화"
+text = "🔴 루비나 탭"
 
 [node name="LvLabel" type="Label" parent="CanvasLayer/LeftPanel/Card2_Automation"]
 layout_mode = 1
@@ -916,12 +916,12 @@ color = Color(0.8, 0, 0, 1)
 [node name="TooltipBar" type="ColorRect" parent="CanvasLayer"]
 layout_mode = 1
 anchors_preset = 0
-offset_left = 280.0
-offset_top = 940.0
-offset_right = 1640.0
+offset_left = 210.0
+offset_top = 900.0
+offset_right = 900.0
 offset_bottom = 1080.0
 visible = false
-color = Color(0.05098, 0, 0, 0.92)
+color = Color(0.05098, 0, 0, 1.0)
 
 [node name="LeftBorder" type="ColorRect" parent="CanvasLayer/TooltipBar"]
 layout_mode = 1
@@ -929,16 +929,16 @@ anchors_preset = 0
 offset_left = 0.0
 offset_top = 0.0
 offset_right = 2.0
-offset_bottom = 140.0
+offset_bottom = 180.0
 color = Color(1, 0.2, 0.2, 1)
 
 [node name="RightBorder" type="ColorRect" parent="CanvasLayer/TooltipBar"]
 layout_mode = 1
 anchors_preset = 0
-offset_left = 1358.0
+offset_left = 688.0
 offset_top = 0.0
-offset_right = 1360.0
-offset_bottom = 140.0
+offset_right = 690.0
+offset_bottom = 180.0
 color = Color(1, 0.2, 0.2, 1)
 
 [node name="TopBorder" type="ColorRect" parent="CanvasLayer/TooltipBar"]
@@ -946,7 +946,7 @@ layout_mode = 1
 anchors_preset = 0
 offset_left = 0.0
 offset_top = 0.0
-offset_right = 1360.0
+offset_right = 690.0
 offset_bottom = 2.0
 color = Color(1, 0.2, 0.2, 1)
 
@@ -966,8 +966,8 @@ layout_mode = 1
 anchors_preset = 0
 offset_left = 60.0
 offset_top = 65.0
-offset_right = 420.0
-offset_bottom = 95.0
+offset_right = 340.0
+offset_bottom = 105.0
 theme_override_colors/font_color = Color(0.733333, 0.733333, 0.733333, 1)
 theme_override_font_sizes/font_size = 18
 text = ""
@@ -975,29 +975,29 @@ text = ""
 [node name="Divider1" type="ColorRect" parent="CanvasLayer/TooltipBar"]
 layout_mode = 1
 anchors_preset = 0
-offset_left = 440.0
+offset_left = 348.0
 offset_top = 10.0
-offset_right = 442.0
-offset_bottom = 130.0
+offset_right = 350.0
+offset_bottom = 170.0
 color = Color(1, 0.2, 0.2, 0.4)
 
 [node name="SynergyTitle" type="Label" parent="CanvasLayer/TooltipBar"]
 layout_mode = 1
 anchors_preset = 0
-offset_left = 460.0
+offset_left = 370.0
 offset_top = 20.0
-offset_right = 600.0
+offset_right = 680.0
 offset_bottom = 42.0
 theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 18
 text = "[ 시너지 ]"
 
 [node name="Synergy1" type="Label" parent="CanvasLayer/TooltipBar"]
 layout_mode = 1
 anchors_preset = 0
-offset_left = 460.0
+offset_left = 370.0
 offset_top = 50.0
-offset_right = 920.0
+offset_right = 680.0
 offset_bottom = 72.0
 theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
 theme_override_font_sizes/font_size = 18
@@ -1006,9 +1006,9 @@ text = ""
 [node name="Synergy2" type="Label" parent="CanvasLayer/TooltipBar"]
 layout_mode = 1
 anchors_preset = 0
-offset_left = 460.0
+offset_left = 370.0
 offset_top = 85.0
-offset_right = 920.0
+offset_right = 680.0
 offset_bottom = 107.0
 theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
 theme_override_font_sizes/font_size = 18
@@ -1017,30 +1017,30 @@ text = ""
 [node name="Divider2" type="ColorRect" parent="CanvasLayer/TooltipBar"]
 layout_mode = 1
 anchors_preset = 0
-offset_left = 940.0
-offset_top = 10.0
-offset_right = 942.0
-offset_bottom = 130.0
+offset_left = 0.0
+offset_top = 115.0
+offset_right = 690.0
+offset_bottom = 117.0
 color = Color(1, 0.2, 0.2, 0.4)
 
 [node name="StatTitle" type="Label" parent="CanvasLayer/TooltipBar"]
 layout_mode = 1
 anchors_preset = 0
-offset_left = 960.0
-offset_top = 20.0
-offset_right = 1100.0
-offset_bottom = 42.0
+offset_left = 60.0
+offset_top = 125.0
+offset_right = 200.0
+offset_bottom = 147.0
 theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 18
 text = "[ 스탯 ]"
 
 [node name="StatATK" type="Label" parent="CanvasLayer/TooltipBar"]
 layout_mode = 1
 anchors_preset = 0
-offset_left = 960.0
-offset_top = 50.0
-offset_right = 1360.0
-offset_bottom = 72.0
+offset_left = 60.0
+offset_top = 150.0
+offset_right = 340.0
+offset_bottom = 172.0
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 18
 text = ""
@@ -1048,10 +1048,10 @@ text = ""
 [node name="StatCooldown" type="Label" parent="CanvasLayer/TooltipBar"]
 layout_mode = 1
 anchors_preset = 0
-offset_left = 960.0
-offset_top = 85.0
-offset_right = 1360.0
-offset_bottom = 107.0
+offset_left = 370.0
+offset_top = 150.0
+offset_right = 680.0
+offset_bottom = 172.0
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 18
 text = ""

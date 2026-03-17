@@ -321,8 +321,12 @@ func _drop_blood() -> void:
 	if not coffin:
 		return
 	var target_pos: Vector2 = coffin.global_position + coffin.size / 2
+	var dist: float = global_position.distance_to(target_pos)
+	var kill_in_coffin_range: bool = dist <= 250.0
+
 	for i in range(3):
 		var drop = drop_scene.instantiate()
 		get_parent().add_child(drop)
 		var drop_value: float = max(1.0, max_hp / 60.0)
-		drop.setup(global_position, drop_value, target_pos, _is_evolved)
+		var apply_bonus: bool = kill_in_coffin_range and (i == 0)
+		drop.setup(global_position, drop_value, target_pos, _is_evolved, apply_bonus)
