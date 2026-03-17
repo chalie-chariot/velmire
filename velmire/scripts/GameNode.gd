@@ -49,6 +49,7 @@ var _buff_damage_mult: float = 1.0
 var _buff_range_mult: float = 1.0
 var _buff_blood_mult: float = 1.0
 var _buff_tweens: Dictionary = {}
+var _pulse_bonus_active: bool = false
 
 # 강화
 var upgrade_level: int = 0
@@ -625,7 +626,7 @@ func _attack_nearest_entity(damage: float) -> bool:
 	if nearest and nearest_dist <= atk_range:
 		_spawn_attack_line(nearest.global_position)
 		if nearest.has_method("take_damage"):
-			var final_damage: float = damage * _buff_damage_mult
+			var final_damage: float = _get_final_damage(damage)
 			if synergy_double_damage and nearest.has_method("is_slowed") and nearest.is_slowed():
 				final_damage *= 2.0
 				# 시너지 데미지 적용 시 "SYNERGY!" 팝업
@@ -714,6 +715,21 @@ func get_buff_blood_mult() -> float:
 
 func _get_effective_cooldown() -> float:
 	return attack_cooldown * _buff_cooldown_mult
+
+
+func trigger_pulse_bonus() -> void:
+	_pulse_bonus_active = true
+	var tw = create_tween()
+	tw.tween_property(self, "modulate", Color(2.0, 2.0, 2.0, 1.0), 0.08)
+	tw.tween_property(self, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.2)
+
+
+func _get_final_damage(base_damage: float) -> float:
+	var dmg: float = base_damage * _buff_damage_mult
+	if _pulse_bonus_active:
+		dmg *= 2.0
+		_pulse_bonus_active = false
+	return dmg
 
 
 func _spawn_attack_line(target_pos: Vector2) -> void:

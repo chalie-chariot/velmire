@@ -11,13 +11,18 @@ const BUFF_DAMAGE_MULT: float = 1.5
 const BUFF_RANGE_MULT: float = 1.5
 const BUFF_BLOOD_MULT: float = 2.0
 const PULSE_HIT_TOLERANCE: float = 25.0
+const PULSE_INTERVAL_NORMAL: float = 5.0
+const PULSE_INTERVAL_DANGER: float = 3.5
+const PULSE_INTERVAL_CRISIS: float = 2.0
+const HP_DANGER_THRESHOLD: float = 0.5
+const HP_CRISIS_THRESHOLD: float = 0.25
 
 var grid_offset: Vector2 = Vector2.ZERO
+var _current_interval: float = PULSE_INTERVAL_NORMAL
 var _hit_lights: Array = []
 var _coffin_center: Vector2 = Vector2(960, 540)
 var grid: Array = []
 var _pulse_time: float = 0.0
-var _pulse_interval: float = 5.0
 var _pulse_radius: float = 0.0
 var _pulse_alpha: float = 0.0
 var _pulsing: bool = false
@@ -37,8 +42,9 @@ func setup(coffin_center: Vector2) -> void:
 	queue_redraw()
 
 func _process(delta: float) -> void:
+	_update_pulse_interval()
 	_pulse_time += delta
-	if _pulse_time >= _pulse_interval:
+	if _pulse_time >= _current_interval:
 		_pulse_time = 0.0
 		_start_pulse()
 
@@ -59,6 +65,31 @@ func _start_pulse() -> void:
 	_pulsing = true
 	_hit_lights.clear()
 
+func _update_pulse_interval() -> void:
+	var main = get_tree().get_first_node_in_group("main")
+	if not main or not main.has_method("get_coffin_hp_ratio"):
+		return
+	var hp_ratio: float = main.get_coffin_hp_ratio()
+	var new_interval: float
+	if hp_ratio <= HP_CRISIS_THRESHOLD:
+		new_interval = PULSE_INTERVAL_CRISIS
+	elif hp_ratio <= HP_DANGER_THRESHOLD:
+		new_interval = PULSE_INTERVAL_DANGER
+	else:
+		new_interval = PULSE_INTERVAL_NORMAL
+	if new_interval != _current_interval:
+		_current_interval = new_interval
+		_on_interval_changed()
+
+func _on_interval_changed() -> void:
+	var coffin = get_tree().get_first_node_in_group("coffin")
+	if not coffin:
+		return
+	var col: Color = Color(1.0, 0.3, 0.3, 1.0) if _current_interval <= PULSE_INTERVAL_CRISIS else Color(1.0, 0.6, 0.3, 1.0)
+	var tw = create_tween()
+	tw.tween_property(coffin, "modulate", col, 0.1)
+	tw.tween_property(coffin, "modulate", Color(1, 1, 1, 1), 0.4)
+
 func _check_pulse_hit_ring_lights() -> void:
 	var lights = get_tree().get_nodes_in_group("ring_light")
 	for light in lights:
@@ -70,6 +101,17 @@ func _check_pulse_hit_ring_lights() -> void:
 		if abs(_pulse_radius - dist) <= PULSE_HIT_TOLERANCE:
 			_hit_lights.append(light)
 			_apply_buff_to_ring_light(light)
+	var nodes = get_tree().get_nodes_in_group("game_nodes")
+	for node in nodes:
+		if node in _hit_lights:
+			continue
+		if not ("is_placed" in node and node.is_placed):
+			continue
+		var ndist: float = _coffin_center.distance_to(node.global_position)
+		if abs(_pulse_radius - ndist) <= PULSE_HIT_TOLERANCE:
+			_hit_lights.append(node)
+			if node.has_method("trigger_pulse_bonus"):
+				node.trigger_pulse_bonus()
 
 func _apply_buff_to_ring_light(light: Node) -> void:
 	if not light.get("_buff_ready"):

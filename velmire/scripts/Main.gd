@@ -261,6 +261,9 @@ func show_tooltip(info: Dictionary, node_color: Color, node: Node2D = null) -> v
 func hide_tooltip() -> void:
 	_tooltip.visible = false
 
+func get_coffin_hp_ratio() -> float:
+	return float(coffin_hp) / float(coffin_max_hp) if coffin_max_hp > 0 else 1.0
+
 func _spawn_start_nodes() -> void:
 	# 기본 노드 3종 (흡혈/결계/증폭) 배치
 	var node_scene = preload("res://scenes/GameNode.tscn")
@@ -385,7 +388,8 @@ func _on_slot_clicked(event: InputEvent, index: int) -> void:
 	var total_nodes: int = get_tree().get_nodes_in_group("game_nodes").size()
 	if total_nodes >= _unlocked_slots:
 		_shake_slot(index)
-		_show_deny_popup("슬롯이 꽉 찼어요! 🔓 슬롯 해금 필요")
+		_show_deny_popup("↓ 아래에서 슬롯을 해금하세요")
+		_show_slot_full_guide()
 		return
 	for d in _owned_nodes:
 		if d["id"] == node_id:
@@ -724,7 +728,8 @@ func _on_owned_node_input(event: InputEvent, data: Dictionary) -> void:
 
 	var total_nodes: int = get_tree().get_nodes_in_group("game_nodes").size()
 	if total_nodes >= _unlocked_slots:
-		_show_deny_popup("슬롯이 꽉 찼어요! 🔓 슬롯 해금 필요")
+		_show_deny_popup("↓ 아래에서 슬롯을 해금하세요")
+		_show_slot_full_guide()
 		return
 
 	_spawn_node_to_field(data, true)  # spend_on_drop=true
@@ -777,6 +782,68 @@ func _on_empty_owned_slot_input(event: InputEvent) -> void:
 
 func _make_slot_input_handler(index: int) -> Callable:
 	return func(event: InputEvent): _on_slot_gui_input(event, index)
+
+func _spawn_guide_arrow(canvas_layer: Node) -> void:
+	var arrow_node = Node2D.new()
+	arrow_node.z_index = 100
+	arrow_node.position = Vector2(960, 820)
+	arrow_node.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	canvas_layer.add_child(arrow_node)
+
+	var shaft = Line2D.new()
+	shaft.width = 16.0
+	shaft.default_color = Color(1.0, 0.92, 0.1, 1.0)
+	shaft.add_point(Vector2(0, -55))
+	shaft.add_point(Vector2(0, 20))
+	arrow_node.add_child(shaft)
+
+	var head = Polygon2D.new()
+	head.color = Color(1.0, 0.92, 0.1, 1.0)
+	head.polygon = PackedVector2Array([
+		Vector2(-28, 18),
+		Vector2(28, 18),
+		Vector2(0, 70)
+	])
+	arrow_node.add_child(head)
+
+	var glow_shaft = Line2D.new()
+	glow_shaft.width = 28.0
+	glow_shaft.default_color = Color(1.0, 0.92, 0.1, 0.25)
+	glow_shaft.add_point(Vector2(0, -55))
+	glow_shaft.add_point(Vector2(0, 20))
+	arrow_node.add_child(glow_shaft)
+
+	var glow_head = Polygon2D.new()
+	glow_head.color = Color(1.0, 0.92, 0.1, 0.25)
+	glow_head.polygon = PackedVector2Array([
+		Vector2(-38, 15),
+		Vector2(38, 15),
+		Vector2(0, 85)
+	])
+	arrow_node.add_child(glow_head)
+
+	var tw = create_tween()
+	tw.tween_property(arrow_node, "modulate:a", 1.0, 0.18).set_ease(Tween.EASE_OUT)
+	tw.tween_property(arrow_node, "modulate:a", 0.0, 0.18)
+	tw.tween_property(arrow_node, "modulate:a", 1.0, 0.18).set_ease(Tween.EASE_OUT)
+	tw.tween_property(arrow_node, "modulate:a", 0.0, 0.22)
+	var acb = func(): arrow_node.queue_free()
+	tw.tween_callback(acb)
+
+func _show_slot_full_guide() -> void:
+	var canvas_layer = $CanvasLayer
+
+	# 1. 화살표 (Line2D + Polygon2D)
+	_spawn_guide_arrow(canvas_layer)
+
+	# 2. 인디케이터 슬롯 노란 강조 점등
+	var hint = _dots_container
+	if hint:
+		var htw = create_tween()
+		htw.tween_property(hint, "modulate", Color(1.5, 1.3, 0.2, 1.0), 0.15).set_ease(Tween.EASE_OUT)
+		htw.tween_property(hint, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.2)
+		htw.tween_property(hint, "modulate", Color(1.5, 1.3, 0.2, 1.0), 0.15)
+		htw.tween_property(hint, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.3)
 
 func _show_deny_popup(text: String) -> void:
 	var old = $CanvasLayer.get_node_or_null("DenyPopup")
@@ -847,7 +914,8 @@ func _on_slot_gui_input(event: InputEvent, index: int) -> void:
 	var total_nodes: int = get_tree().get_nodes_in_group("game_nodes").size()
 	if total_nodes >= _unlocked_slots:
 		_shake_slot(index)
-		_show_deny_popup("슬롯이 꽉 찼어요! 🔓 슬롯 해금 필요")
+		_show_deny_popup("↓ 아래에서 슬롯을 해금하세요")
+		_show_slot_full_guide()
 		return
 
 	_pending_spawn_index = index
