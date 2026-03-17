@@ -50,8 +50,12 @@ func _process(delta: float) -> void:
 			_size = clamp(dist / 45.0, 1.0, _size)
 
 			if dist < 8.0:
-				ResourceManager.add_blood(value)
-				ResourceManager.heal_coffin(value * 2.0)
+				var blood_mult: float = 1.0
+				var hp = get_tree().get_first_node_in_group("heart_pulse")
+				if hp and hp.has_method("get_max_blood_mult"):
+					blood_mult = hp.get_max_blood_mult()
+				ResourceManager.add_blood(value * blood_mult)
+				ResourceManager.heal_coffin(value * 2.0 * blood_mult)
 				queue_free()
 
 	queue_redraw()

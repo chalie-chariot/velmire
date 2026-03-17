@@ -5,8 +5,15 @@ const GRID_COLS: int = 24
 const GRID_ROWS: int = 14
 const CELL_SIZE: int = 80
 const COFFIN_RANGE: float = 400.0  # 노드 배치 가능 관 주변 반경
+const BUFF_DURATION: float = 5.0
+const BUFF_COOLDOWN_MULT: float = 0.5
+const BUFF_DAMAGE_MULT: float = 1.5
+const BUFF_RANGE_MULT: float = 1.5
+const BUFF_BLOOD_MULT: float = 2.0
+const PULSE_HIT_TOLERANCE: float = 25.0
 
 var grid_offset: Vector2 = Vector2.ZERO
+var _hit_lights: Array = []
 var _coffin_center: Vector2 = Vector2(960, 540)
 var grid: Array = []
 var _pulse_time: float = 0.0
@@ -39,15 +46,64 @@ func _process(delta: float) -> void:
 		_pulse_radius += 600.0 * delta
 		var progress: float = _pulse_radius / _max_pulse_radius
 		_pulse_alpha = pow(1.0 - progress, 1.5)
+		_check_pulse_hit_ring_lights()
 		if _pulse_radius >= _max_pulse_radius:
 			_pulsing = false
 			_pulse_alpha = 0.0
+			_hit_lights.clear()
 		queue_redraw()
 
 func _start_pulse() -> void:
 	_pulse_radius = 0.0
 	_pulse_alpha = 1.0
 	_pulsing = true
+	_hit_lights.clear()
+
+func _check_pulse_hit_ring_lights() -> void:
+	var lights = get_tree().get_nodes_in_group("ring_light")
+	for light in lights:
+		if light in _hit_lights:
+			continue
+		if not ("is_placed" in light and light.is_placed):
+			continue
+		var dist: float = _coffin_center.distance_to(light.global_position)
+		if abs(_pulse_radius - dist) <= PULSE_HIT_TOLERANCE:
+			_hit_lights.append(light)
+			_apply_buff_to_ring_light(light)
+
+func _apply_buff_to_ring_light(light: Node) -> void:
+	var buff_type: int = randi() % 4
+	var nodes = get_tree().get_nodes_in_group("game_nodes")
+	var buffed_nodes: Array = []
+	for node in nodes:
+		if node.global_position.distance_to(light.global_position) <= 300.0:
+			buffed_nodes.append(node)
+	if buffed_nodes.is_empty():
+		return
+	for node in buffed_nodes:
+		if not node.has_method("apply_buff"):
+			continue
+		match buff_type:
+			0:
+				node.apply_buff("cooldown", BUFF_COOLDOWN_MULT, BUFF_DURATION)
+			1:
+				node.apply_buff("damage", BUFF_DAMAGE_MULT, BUFF_DURATION)
+			2:
+				node.apply_buff("range", BUFF_RANGE_MULT, BUFF_DURATION)
+			3:
+				node.apply_buff("blood", BUFF_BLOOD_MULT, BUFF_DURATION)
+	if light.has_method("on_buff_received"):
+		light.on_buff_received(buff_type, buffed_nodes)
+
+func get_max_blood_mult() -> float:
+	var max_mult: float = 1.0
+	var nodes = get_tree().get_nodes_in_group("game_nodes")
+	for node in nodes:
+		if node.has_method("get_buff_blood_mult"):
+			var m: float = node.get_buff_blood_mult()
+			if m > max_mult:
+				max_mult = m
+	return max_mult
 
 func _draw() -> void:
 	# 관 범위 원형 외곽선 (항상 표시)

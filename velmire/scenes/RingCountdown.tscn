@@ -1,0 +1,18 @@
+[gd_scene format=3 uid="uid://dwtvadjgtxybu"]
+
+[ext_resource type="Shader" uid="uid://y4m6omaocyte" path="res://shaders/ring_countdown.gdshader" id="1_wiyh0"]
+[ext_resource type="Script" uid="uid://c2tv5t44300nd" path="res://scripts/RingCountdown.gd" id="2_q8sxp"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_q8sxp"]
+shader = ExtResource("1_wiyh0")
+shader_parameter/arc_ratio = 1.0
+shader_parameter/warning = 0.0
+shader_parameter/fade = 1.0
+
+[node name="RingCountdown" type="Node2D" unique_id=1795649170]
+script = ExtResource("2_q8sxp")
+
+[node name="ArcRect" type="ColorRect" parent="." unique_id=1609829514]
+material = SubResource("ShaderMaterial_q8sxp")
+offset_right = 40.0
+offset_bottom = 40.0

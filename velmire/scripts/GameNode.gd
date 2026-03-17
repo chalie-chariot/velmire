@@ -44,6 +44,11 @@ var _range_indicator: Panel = null
 var _removal_countdown: float = -1.0
 var _removal_tween: Tween = null
 var _is_being_dragged: bool = false
+var _buff_cooldown_mult: float = 1.0
+var _buff_damage_mult: float = 1.0
+var _buff_range_mult: float = 1.0
+var _buff_blood_mult: float = 1.0
+var _buff_tweens: Dictionary = {}
 
 # 강화
 var upgrade_level: int = 0
@@ -275,7 +280,7 @@ func _process(delta: float) -> void:
 
 	if is_placed:
 		_attack_timer += delta
-		if _attack_timer >= attack_cooldown:
+		if _attack_timer >= _get_effective_cooldown():
 			_attack_timer = 0.0
 			_has_attacked_once = _do_attack()  # 적중 시에만 true, 빗나가면 false로 숨김
 
@@ -384,7 +389,7 @@ func _draw() -> void:
 
 	# 쿨다운 게이지: 첫 공격 후, 쿨타임 중일 때만 표시 (_attack_timer > 0)
 	if is_placed and _has_attacked_once and _attack_timer > 0:
-		var cooldown_ratio: float = _attack_timer / attack_cooldown
+		var cooldown_ratio: float = _attack_timer / _get_effective_cooldown()
 
 		# 쿨다운 배경 링 (어두운)
 		draw_arc(Vector2.ZERO, radius + 6.0,
@@ -401,21 +406,24 @@ func _draw() -> void:
 				3.0)
 
 		# 쿨다운 완료 시 잠깐 번쩍
-		if _attack_timer >= attack_cooldown - 0.1:
+		if _attack_timer >= _get_effective_cooldown() - 0.1:
 			draw_arc(Vector2.ZERO, radius + 6.0,
 				0, TAU, 64,
 				Color(node_color.r, node_color.g, node_color.b, 0.4),
 				5.0)
 
 func _get_ability_range() -> float:
+	var base_range: float
 	match node_type:
 		"흡혈":
-			return 200.0
+			base_range = 200.0
 		"결계":
-			return 400.0 if synergy_wide_slow else 200.0
+			base_range = 400.0 if synergy_wide_slow else 200.0
 		"증폭":
-			return 120.0
-	return 200.0
+			base_range = 120.0
+		_:
+			base_range = 200.0
+	return base_range * _buff_range_mult
 
 func on_right_click() -> void:
 	var cm = get_tree().get_first_node_in_group("connection_manager")
@@ -518,28 +526,13 @@ func _try_place_on_grid() -> void:
 			return  # 그리드 배치 안함
 
 	# 2순위: 마우스가 인디케이터 영역(y > 880)이면 그리드 배치 안함
-	# 링라이트 범위 안이면 y > 880 예외 허용
-	main = get_tree().get_first_node_in_group("main")
-	var in_ring_light: bool = false
-	var lights = get_tree().get_nodes_in_group("ring_light")
-	for light in lights:
-		if global_position.distance_to(light.global_position) <= REMOVAL_VALID_RANGE:
-			in_ring_light = true
-			break
 	print("mouse_pos.y: ", mouse_pos.y)
-	if mouse_pos.y > 880 and not in_ring_light:
+	if mouse_pos.y > 880:
 		print("y > 880 → 슬롯 복귀")
 		_return_to_slot()
 		return
 
-	# 3순위: 유효 영역 체크 (관 300px 또는 링라이트 300px 내)
-	if not main or not main._is_valid_node_placement(global_position):
-		if main:
-			main._show_deny_popup("설치 범위를 벗어났습니다")
-		_return_to_slot()
-		return
-
-	# 4순위: 그리드 배치 시도
+	# 3순위: 그리드 배치 시도
 	var grid = get_tree().get_first_node_in_group("heart_pulse")
 	if not grid:
 		_return_to_slot()
@@ -640,10 +633,11 @@ func _attack_nearest_entity(damage: float) -> bool:
 			nearest_dist = d
 			nearest = e
 
-	if nearest and nearest_dist <= 200.0:
+	var atk_range: float = _get_ability_range()
+	if nearest and nearest_dist <= atk_range:
 		_spawn_attack_line(nearest.global_position)
 		if nearest.has_method("take_damage"):
-			var final_damage: float = damage
+			var final_damage: float = damage * _buff_damage_mult
 			if synergy_double_damage and nearest.has_method("is_slowed") and nearest.is_slowed():
 				final_damage *= 2.0
 				# 시너지 데미지 적용 시 "SYNERGY!" 팝업
@@ -664,10 +658,9 @@ func _attack_nearest_entity(damage: float) -> bool:
 	return false
 
 func _slow_nearest_entity() -> bool:
-	var slow_range: float = 200.0
+	var slow_range: float = _get_ability_range()
 	var eff_duration: float = slow_duration
 	if synergy_wide_slow:
-		slow_range *= 2.0
 		eff_duration *= 2.0
 
 	var hit_any: bool = false
@@ -684,14 +677,54 @@ func _boost_adjacent_nodes() -> bool:
 	var nodes = get_tree().get_nodes_in_group("game_nodes")
 	var boosted_any: bool = false
 	var factor: float = 1.0 - cooldown_reduction
+	var boost_range: float = _get_ability_range()
 	for n in nodes:
 		if n == self:
 			continue
 		var d: float = global_position.distance_to(n.global_position)
-		if d < 120.0:
+		if d < boost_range:
 			n.attack_cooldown = attack_cooldown * factor
 			boosted_any = true
 	return boosted_any
+
+func apply_buff(type: String, mult: float, duration: float) -> void:
+	if _buff_tweens.has(type) and _buff_tweens[type] is Tween and _buff_tweens[type].is_valid():
+		_buff_tweens[type].kill()
+	match type:
+		"cooldown":
+			_buff_cooldown_mult = mult
+		"damage":
+			_buff_damage_mult = mult
+		"range":
+			_buff_range_mult = mult
+		"blood":
+			_buff_blood_mult = mult
+	var tw = create_tween()
+	tw.tween_interval(duration)
+	tw.tween_callback(_clear_buff.bind(type))
+	_buff_tweens[type] = tw
+
+
+func _clear_buff(type: String) -> void:
+	match type:
+		"cooldown":
+			_buff_cooldown_mult = 1.0
+		"damage":
+			_buff_damage_mult = 1.0
+		"range":
+			_buff_range_mult = 1.0
+		"blood":
+			_buff_blood_mult = 1.0
+	_buff_tweens.erase(type)
+
+
+func get_buff_blood_mult() -> float:
+	return _buff_blood_mult
+
+
+func _get_effective_cooldown() -> float:
+	return attack_cooldown * _buff_cooldown_mult
+
 
 func _spawn_attack_line(target_pos: Vector2) -> void:
 	var line = Node2D.new()

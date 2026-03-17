@@ -1,8 +1,16 @@
 extends Node2D
 
 const LIFETIME = 60.0
-const WARNING_TIME = 20.0
+const WARNING_TIME = 12.0  # 20% = 12초
 const RANGE_RADIUS: float = 300.0
+const BUFF_COLORS: Array = [
+	Color(0.4, 0.5, 1.0, 1.0),
+	Color(1.0, 0.4, 0.1, 1.0),
+	Color(0.2, 1.0, 0.4, 1.0),
+	Color(1.0, 0.9, 0.1, 1.0),
+]
+const BUFF_ICONS: Array = ["⏱", "⚔", "🔵", "🩸"]
+const BUFF_NAMES: Array = ["쿨다운 감소", "데미지 증가", "범위 확장", "혈액 증가"]
 
 var range_radius: float = RANGE_RADIUS
 var ring_size: float = 30.0
@@ -10,10 +18,9 @@ var hole_size: float = 12.0
 var is_placed: bool = false
 var is_dragging: bool = false
 
+var _countdown: Node = null
 var _time_left: float = LIFETIME
-var _warning_started: bool = false
 var _expired: bool = false
-var _warning_tween: Tween = null
 var shader_index: int = -1
 
 func _ready() -> void:
@@ -58,14 +65,9 @@ func _process(delta: float) -> void:
 		return
 
 	_time_left -= delta
-
-	if _time_left <= WARNING_TIME and not _warning_started:
-		_warning_started = true
-		_start_countdown()
-
-	if _warning_started:
-		var ratio = _time_left / WARNING_TIME
-		_update_countdown_visual(ratio)
+	var ratio: float = clampf(_time_left / LIFETIME, 0.0, 1.0)
+	if _countdown and is_instance_valid(_countdown):
+		_countdown.update_ratio(ratio)
 
 	if _time_left <= 0.0:
 		_expire()
@@ -119,10 +121,12 @@ func _try_place() -> void:
 	var main = get_tree().get_first_node_in_group("main")
 	if main:
 		main._register_ring_light(self)
+	_on_placed()
 	_start_pulse()
 
 func _start_pulse() -> void:
-	_emit_pulse()
+	var is_warn: bool = _time_left <= WARNING_TIME
+	_emit_pulse(is_warn)
 	var timer = Timer.new()
 	timer.wait_time = 2.5
 	timer.one_shot = false
@@ -131,15 +135,19 @@ func _start_pulse() -> void:
 	add_child(timer)
 
 func _on_pulse_timer_timeout() -> void:
-	_emit_pulse()
+	var is_warn: bool = _time_left <= WARNING_TIME
+	_emit_pulse(is_warn)
 
-func _emit_pulse() -> void:
-	var pts = 64
-	var center_pos = global_position
+func _emit_pulse(is_warning: bool) -> void:
+	var col: Color = Color(0.0, 0.9, 0.85, 0.6)  # 청록
+	if is_warning:
+		col = Color(1.0, 0.15, 0.2, 0.6)  # 빨강
+	var pts: int = 64
+	var center_pos: Vector2 = global_position
 
 	for wave in range(2):
 		var pulse = Line2D.new()
-		pulse.default_color = Color(1.0, 0.9, 0.6, 0.0)
+		pulse.default_color = Color(col.r, col.g, col.b, 0.0)
 		pulse.width = 3.0
 		pulse.antialiased = true
 		for p in range(pts + 1):
@@ -147,29 +155,29 @@ func _emit_pulse() -> void:
 			pulse.add_point(center_pos + Vector2(cos(a), sin(a)) * 5.0)
 		get_parent().add_child(pulse)
 
-		var wave_delay = wave * 0.3
-		var updater = _make_pulse_updater(pulse, pts, center_pos)
+		var wave_delay: float = wave * 0.3
+		var updater = _make_pulse_updater(pulse, pts, center_pos, col)
 
 		var tw = create_tween()
 		tw.tween_interval(wave_delay)
-		tw.tween_method(updater, 0.0, 1.0, 2.5
-		).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tw.tween_method(updater, 0.0, 1.0, 2.5)\
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 		tw.tween_callback(_on_pulse_done.bind(pulse))
 
-func _make_pulse_updater(pulse: Line2D, pts: int, center_pos: Vector2) -> Callable:
-	return func(t: float):
+func _make_pulse_updater(pulse: Line2D, pts: int, center_pos: Vector2, base_col: Color) -> Callable:
+	return func(t: float) -> void:
 		if not is_instance_valid(pulse):
 			return
-		var r = lerp(5.0, range_radius * 1.15, t)
+		var r: float = lerpf(5.0, range_radius * 1.15, t)
 		var alpha: float
 		if t < 0.15:
-			alpha = lerp(0.0, 0.7, t / 0.15)
+			alpha = lerpf(0.0, 0.7, t / 0.15)
 		else:
-			alpha = lerp(0.7, 0.0, (t - 0.15) / 0.85)
-		pulse.default_color = Color(1.0, 0.95, 0.7, alpha)
-		pulse.width = lerp(4.0, 0.3, t)
+			alpha = lerpf(0.7, 0.0, (t - 0.15) / 0.85)
+		pulse.default_color = Color(base_col.r, base_col.g, base_col.b, alpha)
+		pulse.width = lerpf(4.0, 0.3, t)
 		for i in range(pts + 1):
-			var a = (TAU / pts) * i
+			var a: float = (TAU / pts) * i
 			pulse.set_point_position(i, center_pos + Vector2(cos(a), sin(a)) * r)
 
 func _on_pulse_done(pulse: Line2D) -> void:
@@ -177,35 +185,15 @@ func _on_pulse_done(pulse: Line2D) -> void:
 		pulse.queue_free()
 
 
-func _start_countdown() -> void:
-	_start_warning_pulse()
+func _on_placed() -> void:
+	_spawn_countdown()
 
 
-func _start_warning_pulse() -> void:
-	_warning_tween = create_tween()
-	_warning_tween.set_loops()
-	_warning_tween.tween_property(self, "modulate",
-		Color(1.5, 0.3, 0.3, 1.0), 0.3)
-	_warning_tween.tween_property(self, "modulate",
-		Color(1.0, 1.0, 1.0, 1.0), 0.3)
-
-
-func _update_countdown_visual(ratio: float) -> void:
-	var idx = shader_index
-	if idx < 0:
-		idx = _get_my_index()
-		if idx >= 0:
-			shader_index = idx
-	if idx < 0:
-		return
-	var base_radius = 300.0  # RANGE_RADIUS와 동일
-	var current_radius = base_radius * ratio
-	var overlay = get_tree().get_first_node_in_group("map_vignette_overlay")
-	if overlay and overlay.material:
-		overlay.material.set_shader_parameter(
-			"bright_radius_" + str(idx),
-			current_radius
-		)
+func _spawn_countdown() -> void:
+	var scene = load("res://scenes/RingCountdown.tscn") as PackedScene
+	_countdown = scene.instantiate()
+	_countdown.global_position = global_position
+	get_parent().add_child(_countdown)
 
 
 func _get_my_index() -> int:
@@ -221,28 +209,86 @@ func _get_my_index() -> int:
 
 
 func _expire() -> void:
-	var idx = shader_index
-	if idx < 0:
-		idx = _get_my_index()
 	_expired = true
+	if _countdown and is_instance_valid(_countdown) and _countdown.has_method("start_fadeout"):
+		_countdown.start_fadeout()
 
-	# 링라이트 만료 시 모든 배치된 노드 유효성 재검사
+	# 링라이트 범위 내 노드 유효성 재검사
 	var nodes = get_tree().get_nodes_in_group("game_nodes")
 	for n in nodes:
 		if n.has_method("_check_validity"):
 			n._check_validity()
 
-	if _warning_tween and _warning_tween.is_valid():
-		_warning_tween.kill()
-	if idx >= 0:
-		var overlay = get_tree().get_first_node_in_group("map_vignette_overlay")
-		if overlay and overlay.material:
-			overlay.material.set_shader_parameter(
-				"bright_radius_" + str(idx), 0.0
-			)
-
+	# 링라이트 페이드아웃
 	var tw = create_tween()
-	tw.tween_property(self, "modulate:a", 0.0, 0.6)\
-		.set_ease(Tween.EASE_IN)
-	var cb = func(): queue_free()
+	tw.tween_property(self, "modulate:a", 0.0, 0.6).set_ease(Tween.EASE_IN)
+	var cb = func() -> void: queue_free()
 	tw.tween_callback(cb)
+
+
+func on_buff_received(buff_type: int, buffed_nodes: Array) -> void:
+	var col: Color = BUFF_COLORS[buff_type] if buff_type < BUFF_COLORS.size() else Color.WHITE
+	var main = get_tree().get_first_node_in_group("main")
+	var canvas_layer: Node = main.get_node("CanvasLayer") if main else null
+
+	# 1. 링라이트 순간 발광
+	var tw = create_tween()
+	tw.tween_property(self, "modulate", col * 2.0, 0.1)
+	tw.tween_property(self, "modulate", Color(1, 1, 1, 1), 0.5)
+
+	# 2. 링라이트 → 노드 빛줄기 방사
+	for node in buffed_nodes:
+		var line = Line2D.new()
+		line.width = 2.0
+		line.default_color = Color(col.r, col.g, col.b, 0.8)
+		line.add_point(global_position)
+		line.add_point(node.global_position)
+		get_parent().add_child(line)
+		var ltw = create_tween()
+		ltw.tween_property(line, "modulate:a", 0.0, 0.4)
+		var lcb = func() -> void: line.queue_free()
+		ltw.tween_callback(lcb)
+		if canvas_layer:
+			_spawn_buff_icon(node, buff_type, canvas_layer)
+
+	# 3. 버프 종류 텍스트 팝업
+	if canvas_layer:
+		_spawn_buff_popup(buff_type, canvas_layer)
+
+
+func _spawn_buff_icon(node: Node, buff_type: int, canvas_layer: Node) -> void:
+	var icon = Label.new()
+	icon.text = BUFF_ICONS[buff_type] if buff_type < BUFF_ICONS.size() else "?"
+	icon.add_theme_font_size_override("font_size", 18)
+	icon.modulate = BUFF_COLORS[buff_type] if buff_type < BUFF_COLORS.size() else Color.WHITE
+	icon.z_index = 100
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var start_pos: Vector2 = node.get_global_transform_with_canvas().origin - Vector2(10, 30)
+	icon.position = start_pos
+	canvas_layer.add_child(icon)
+	var itw = create_tween()
+	itw.set_parallel(true)
+	itw.tween_property(icon, "position:y", start_pos.y - 20, 5.0).set_ease(Tween.EASE_OUT)
+	itw.tween_property(icon, "modulate:a", 0.0, 1.0).set_delay(4.0)
+	itw.set_parallel(false)
+	var icb = func() -> void: icon.queue_free()
+	itw.tween_callback(icb)
+
+
+func _spawn_buff_popup(buff_type: int, canvas_layer: Node) -> void:
+	var popup = Label.new()
+	popup.text = (BUFF_NAMES[buff_type] if buff_type < BUFF_NAMES.size() else "버프") + "!"
+	popup.add_theme_font_size_override("font_size", 16)
+	popup.modulate = BUFF_COLORS[buff_type] if buff_type < BUFF_COLORS.size() else Color.WHITE
+	popup.z_index = 100
+	popup.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var start_pos: Vector2 = get_global_transform_with_canvas().origin - Vector2(40, 60)
+	popup.position = start_pos
+	canvas_layer.add_child(popup)
+	var ptw = create_tween()
+	ptw.set_parallel(true)
+	ptw.tween_property(popup, "position:y", start_pos.y - 30, 0.6).set_ease(Tween.EASE_OUT)
+	ptw.tween_property(popup, "modulate:a", 0.0, 0.6).set_delay(0.3)
+	ptw.set_parallel(false)
+	var pcb = func() -> void: popup.queue_free()
+	ptw.tween_callback(pcb)
