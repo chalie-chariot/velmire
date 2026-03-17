@@ -1,4 +1,4 @@
-[gd_scene load_steps=26 format=3 uid="uid://b1main001"]
+[gd_scene load_steps=27 format=3 uid="uid://b1main001"]
 
 [ext_resource type="Script" path="res://scripts/Main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/HeartPulse.tscn" id="2_heartpulse"]
@@ -79,6 +79,12 @@ content_margin_left = 30
 content_margin_top = 12
 content_margin_right = 30
 content_margin_bottom = 12
+
+[sub_resource type="StyleBoxLine" id="StyleBoxLine_separator"]
+color = Color(0.2, 0.2, 0.2, 1)
+grow_begin = -1.0
+grow_end = 1.0
+thickness = 1
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_node_slot"]
 bg_color = Color(0.101961, 0, 0, 1)
@@ -504,13 +510,40 @@ theme_override_styles/fill = SubResource("StyleBoxFlat_progress_fill")
 max_value = 100.0
 value = 0.0
 
-[node name="SlotCountLabel" type="Label" parent="CanvasLayer/LeftPanel"]
+[node name="Separator" type="HSeparator" parent="CanvasLayer/LeftPanel"]
 layout_mode = 1
 anchors_preset = 0
 offset_left = 10.0
-offset_top = 595.0
+offset_top = 218.0
 offset_right = 210.0
-offset_bottom = 615.0
+offset_bottom = 222.0
+theme_override_styles/separator = SubResource("StyleBoxLine_separator")
+
+[node name="RingLightCard" type="Panel" parent="CanvasLayer/LeftPanel"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 10.0
+offset_top = 228.0
+offset_right = 210.0
+offset_bottom = 286.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+
+[node name="Separator2" type="HSeparator" parent="CanvasLayer/LeftPanel"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 10.0
+offset_top = 292.0
+offset_right = 210.0
+offset_bottom = 296.0
+theme_override_styles/separator = SubResource("StyleBoxLine_separator")
+
+[node name="NodeHeader" type="Label" parent="CanvasLayer/LeftPanel"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 10.0
+offset_top = 302.0
+offset_right = 210.0
+offset_bottom = 322.0
 theme_override_colors/font_color = Color(0.8, 0.3, 0.3, 1)
 theme_override_font_sizes/font_size = 14
 text = "배치 0 / 3"
@@ -520,7 +553,7 @@ horizontal_alignment = 1
 layout_mode = 1
 anchors_preset = 0
 offset_left = 10.0
-offset_top = 620.0
+offset_top = 328.0
 offset_right = 210.0
 offset_bottom = 1020.0
 theme_override_constants/separation = 8

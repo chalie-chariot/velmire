@@ -176,6 +176,7 @@ func _ready() -> void:
 	$CanvasLayer.add_child(_map_vignette_overlay)
 	$CanvasLayer.move_child(_map_vignette_overlay, 0)
 	_map_vignette_overlay.z_index = -1000
+	_map_vignette_overlay.add_to_group("map_vignette_overlay")
 
 ## 아이템으로 암전의 특정 영역을 밝힐 때 사용. area_index: 0 또는 1, center: 화면 좌표, radius: 밝은 반경(px), strength: 0~1
 func set_vignette_bright_area(area_index: int, center: Vector2, radius: float, strength: float = 1.0) -> void:
@@ -210,6 +211,8 @@ func _register_ring_light(ring: Node2D) -> void:
 			placed.append(l)
 	var idx = placed.size() - 1
 	print("설치 인덱스:", idx)
+	if "shader_index" in ring:
+		ring.shader_index = idx
 
 	if _map_vignette_overlay and _map_vignette_overlay.material:
 		print("셰이더 파라미터 설정 시도")
@@ -234,11 +237,6 @@ func _register_ring_light(ring: Node2D) -> void:
 	_build_owned_nodes()
 
 func _spawn_ring_light() -> void:
-	if ResourceManager.ruby < 2:
-		_show_deny_popup("루비 부족 🔴2 필요")
-		return
-	ResourceManager.spend_ruby(2)
-	update_ruby_ui(ResourceManager.ruby)
 	var RingLightScript = preload("res://scripts/RingLight.gd")
 	var ring = RingLightScript.new()
 	ring.global_position = get_viewport().get_mouse_position()
@@ -438,6 +436,45 @@ func _highlight_slot(index: int, on: bool) -> void:
 	style.border_width_bottom = 2
 	slot.add_theme_stylebox_override("panel", style)
 
+const PLACEMENT_VALID_RANGE: float = 300.0  # 관/링라이트 유효 배치 반경 (RingLight.RANGE_RADIUS와 동일)
+
+func _is_valid_node_placement(pos: Vector2) -> bool:
+	print("노드 배치 위치: ", pos)
+	# 1. 관 중심 기준 범위 체크
+	var coffin = get_tree().get_first_node_in_group("coffin")
+	if coffin:
+		var coffin_center: Vector2 = coffin.global_position + coffin.size / 2.0
+		var dist: float = pos.distance_to(coffin_center)
+		print("관까지 거리: ", dist)
+		if dist <= PLACEMENT_VALID_RANGE:
+			print("관 범위 내 → 통과")
+			return true
+	# 2. 링라이트 범위 체크
+	var lights = get_tree().get_nodes_in_group("ring_light")
+	print("링라이트 개수: ", lights.size())
+	for light in lights:
+		var dist: float = pos.distance_to(light.global_position)
+		print("링라이트 거리: ", dist, " / 위치: ", light.global_position)
+		if ("is_placed" in light and light.is_placed):
+			var r: float = light.range_radius if "range_radius" in light else PLACEMENT_VALID_RANGE
+			if dist <= r:
+				print("링라이트 범위 내 → 통과")
+				return true
+	print("모두 실패 → 배치 거부")
+	return false
+
+func remove_game_node(node: Node2D) -> void:
+	if "grid_col" in node and "grid_row" in node:
+		var col: int = node.grid_col
+		var row: int = node.grid_row
+		if col >= 0 and row >= 0:
+			var grid = get_tree().get_first_node_in_group("heart_pulse")
+			if grid and grid.has_method("remove_node"):
+				grid.remove_node(col, row)
+	if node in _selected_nodes:
+		_selected_nodes.erase(node)
+	_update_slot_count_label()
+
 func _get_slot_at(pos: Vector2) -> int:
 	var slots = _dots_container.get_children()
 	for i in range(min(6, slots.size())):
@@ -582,7 +619,13 @@ func _build_owned_nodes() -> void:
 		row.gui_input.connect(func(ev): _on_owned_node_input(ev, data))
 		_owned_container.add_child(row)
 
-	# 링라이트 버튼
+	# 링라이트 버튼 (RingLightCard에 배치 — OwnedNodesContainer 바로 위)
+	var ring_card = $CanvasLayer/LeftPanel.get_node_or_null("RingLightCard")
+	if ring_card:
+		for child in ring_card.get_children():
+			child.queue_free()
+		await get_tree().process_frame
+
 	var installed = 0
 	for l in get_tree().get_nodes_in_group("ring_light"):
 		if "is_placed" in l and l.is_placed:
@@ -606,7 +649,15 @@ func _build_owned_nodes() -> void:
 		   ev.button_index == MOUSE_BUTTON_LEFT and ev.pressed:
 			_spawn_ring_light()
 	)
-	_owned_container.add_child(ring_btn)
+	if ring_card:
+		ring_btn.set_anchors_preset(Control.PRESET_FULL_RECT)
+		ring_btn.offset_left = 4
+		ring_btn.offset_top = 4
+		ring_btn.offset_right = -4
+		ring_btn.offset_bottom = -4
+		ring_card.add_child(ring_btn)
+	else:
+		_owned_container.add_child(ring_btn)
 
 	# 4. 빈 슬롯 3개 (클릭해도 아무 동작 안함)
 	for _i in range(3):
@@ -2466,7 +2517,7 @@ func update_blood_ui(amount: float) -> void:
 
 func _update_slot_count_label() -> void:
 	var used: int = get_tree().get_nodes_in_group("game_nodes").size()
-	var label: Label = $CanvasLayer/LeftPanel/SlotCountLabel
+	var label: Label = $CanvasLayer/LeftPanel/NodeHeader
 	if label:
 		label.text = "배치 %d / %d" % [used, _unlocked_slots]
 		if used >= _unlocked_slots:

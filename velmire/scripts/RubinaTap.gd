@@ -40,6 +40,7 @@ var _shader_mat: ShaderMaterial
 var _time_accum: float = 0.0
 var _is_at_cap: bool = false
 var _collecting: bool = false
+var _resources_added_this_cycle: bool = false
 
 
 func get_cap() -> int:
@@ -214,37 +215,91 @@ func _play_flask_squash_drain() -> void:
 	tw_fill.tween_method(set_fill, from_f, 0.0, FILL_DRAIN_DUR).set_ease(Tween.EASE_OUT)
 
 
-func _run_float_tween(lbl: Label, bob_y: float, half_period: float) -> void:
-	var start_y: float = lbl.position.y
-	var tw: Tween = create_tween()
-	tw.tween_property(lbl, "position:y", start_y + bob_y, half_period).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(lbl, "position:y", start_y, half_period).set_ease(Tween.EASE_IN_OUT)
+func _run_float_then_launch(lbl: Label, target_pos: Vector2, is_last: bool, rubies_to_add: int, chips_to_add: int) -> void:
+	if not is_instance_valid(lbl):
+		if is_last:
+			_collecting = false
+		return
+	if not is_inside_tree():
+		if is_last:
+			_collecting = false
+		return
+	var base_y: float = lbl.position.y
+	var float_tw = create_tween()
+	if not float_tw:
+		if is_last:
+			_collecting = false
+		return
+	float_tw.set_loops(0)
+	float_tw.tween_property(lbl, "position:y",
+		base_y - randf_range(5.0, 9.0),
+		randf_range(0.12, 0.18))\
+		.set_ease(Tween.EASE_IN_OUT)\
+		.set_trans(Tween.TRANS_SINE)
+	float_tw.tween_property(lbl, "position:y",
+		base_y + randf_range(3.0, 6.0),
+		randf_range(0.12, 0.18))\
+		.set_ease(Tween.EASE_IN_OUT)\
+		.set_trans(Tween.TRANS_SINE)
+	float_tw.tween_property(lbl, "position:y",
+		base_y,
+		randf_range(0.08, 0.12))\
+		.set_ease(Tween.EASE_IN_OUT)\
+		.set_trans(Tween.TRANS_SINE)
+	var lbl_launch = lbl
+	var launch_cb = func():
+		_launch_ruby(lbl_launch, target_pos, is_last, rubies_to_add, chips_to_add)
+	float_tw.tween_callback(launch_cb)
 
 
-func _fly_ruby_to_target(lbl: Label, start_pos: Vector2, target_pos: Vector2, is_last: bool, rubies_to_add: int, chips_to_add: int) -> void:
-	var via_x: float = lerpf(start_pos.x, target_pos.x, 0.5) + randf_range(-40, 40)
-	var via_y: float = lerpf(start_pos.y, target_pos.y, 0.5) + randf_range(-50, -20)
-	var via: Vector2 = Vector2(via_x, via_y)
-	var dur: float = randf_range(0.35, 0.45)
-	var half: float = dur * 0.5
-	var tw: Tween = create_tween()
-	tw.tween_property(lbl, "position", via, half).set_ease(Tween.EASE_IN)
-	tw.tween_property(lbl, "position", target_pos, half).set_ease(Tween.EASE_OUT)
-	tw.tween_callback(_on_ruby_arrive.bind(lbl, target_pos, is_last, rubies_to_add, chips_to_add))
+func _launch_ruby(ruby: Label, target_pos: Vector2, is_last: bool, rubies_to_add: int, chips_to_add: int) -> void:
+	if not is_instance_valid(ruby):
+		if is_last:
+			_collecting = false
+		return
+	if not is_inside_tree():
+		if is_last:
+			_collecting = false
+		return
+	var duration = randf_range(0.35, 0.45)
+	var via = Vector2(
+		lerpf(ruby.position.x, target_pos.x, 0.5) + randf_range(-40.0, 40.0),
+		lerpf(ruby.position.y, target_pos.y, 0.5) + randf_range(-50.0, -20.0)
+	)
+	var tw = create_tween()
+	if not tw:
+		if is_last:
+			_collecting = false
+		return
+	tw.tween_property(ruby, "position", via, duration * 0.5)\
+		.set_ease(Tween.EASE_IN)
+	tw.tween_property(ruby, "position", target_pos, duration * 0.5)\
+		.set_ease(Tween.EASE_OUT)
+	var arrive_cb = func():
+		_on_ruby_arrive(ruby, target_pos, is_last, rubies_to_add, chips_to_add)
+	tw.tween_callback(arrive_cb)
 
 
 func _on_ruby_arrive(lbl: Label, target_pos: Vector2, is_last: bool, rubies_to_add: int, chips_to_add: int) -> void:
 	_spawn_arrive_effect(target_pos)
 	if is_last:
-		if rubies_to_add > 0:
-			ResourceManager.add_ruby(rubies_to_add)
-		if chips_to_add > 0:
-			ResourceManager.add_chip(chips_to_add)
-			_play_chip_flash()
+		if not _resources_added_this_cycle:
+			_resources_added_this_cycle = true
+			if rubies_to_add > 0:
+				ResourceManager.add_ruby(rubies_to_add)
+			if chips_to_add > 0:
+				ResourceManager.add_chip(chips_to_add)
+				_play_chip_flash()
 		_collecting = false
-	var tw: Tween = create_tween()
-	tw.tween_property(lbl, "scale", Vector2.ZERO, 0.08).set_ease(Tween.EASE_IN)
-	tw.tween_callback(lbl.queue_free)
+	if not is_instance_valid(lbl):
+		return
+	var shrink_tw = create_tween()
+	if not shrink_tw:
+		lbl.queue_free()
+		return
+	shrink_tw.tween_property(lbl, "scale", Vector2.ZERO, 0.08).set_ease(Tween.EASE_IN)
+	var free_cb = lbl.queue_free
+	shrink_tw.tween_callback(free_cb)
 
 
 func _spawn_arrive_effect(pos: Vector2) -> void:
@@ -355,6 +410,7 @@ func _collect_rubies() -> void:
 	if _collecting:
 		return
 	_collecting = true
+	_resources_added_this_cycle = false
 
 	var count: int = accumulated
 	accumulated = 0
@@ -376,8 +432,10 @@ func _collect_rubies() -> void:
 	var tap_canvas_origin: Vector2 = get_global_transform_with_canvas().origin
 	var target_screen: Vector2 = _get_q_tab_target_screen_pos()
 
-	# 1단계: 루비 생성 (탭에서) → 부유 위치로 상승 → 부유
-	var ruby_labels: Array[Label] = []
+	# 1단계: 루비 생성 (0.05초 간격) → 상승 → 부유 (각자 독립) → 부유 완료 후 발사
+	var icon_half: Vector2 = Vector2(7, 7)
+	var target_adj: Vector2 = target_screen - icon_half
+
 	for i in icon_count:
 		await get_tree().create_timer(SPAWN_INTERVAL * i).timeout
 		var spawn_at_tap: Vector2 = tap_canvas_origin + Vector2(randf_range(-12, 12), 0)
@@ -394,29 +452,19 @@ func _collect_rubies() -> void:
 		lbl.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 		lbl.position = spawn_at_tap
 
+		var is_last_flag: bool = (i == icon_count - 1)
+		var lbl_ref = lbl
+		var rubies_val = rubies_to_add
+		var chips_val = chips_to_add
+		var rise_cb = func():
+			_run_float_then_launch(lbl_ref, target_adj, is_last_flag, rubies_val, chips_val)
 		var rise_tw: Tween = create_tween()
 		rise_tw.tween_property(lbl, "position", float_pos, RISE_TO_FLOAT_DUR).set_ease(Tween.EASE_OUT)
-		rise_tw.tween_callback(func(): _run_float_tween(lbl, randf_range(-6, 6), randf_range(0.15, 0.25)))
+		rise_tw.tween_callback(rise_cb)
 
-		ruby_labels.append(lbl)
-
-	# 0.4초 대기
-	await get_tree().create_timer(FLOAT_DUR).timeout
-
-	# 2단계 시작: 플라스크 반응 + 촤르르륵 발사
+	# 상승 완료 시점에 플라스크 반응
+	await get_tree().create_timer(RISE_TO_FLOAT_DUR + 0.1).timeout
 	_play_flask_squash_drain()
-
-	var icon_half: Vector2 = Vector2(7, 7)
-	var target_adj: Vector2 = target_screen - icon_half
-
-	for i in ruby_labels.size():
-		await get_tree().create_timer(FIRE_INTERVAL * i).timeout
-		var lbl: Label = ruby_labels[i]
-		if not is_instance_valid(lbl):
-			continue
-		var start_pos: Vector2 = lbl.position
-		var is_last: bool = (i == ruby_labels.size() - 1)
-		_fly_ruby_to_target(lbl, start_pos, target_adj, is_last, rubies_to_add, chips_to_add)
 
 
 func _get_auto_progress_bar() -> ProgressBar:
@@ -434,4 +482,5 @@ func _input(event: InputEvent) -> void:
 			var shape := $Area2D/CollisionShape2D.shape as CircleShape2D
 			if shape and local_pos.length() <= shape.radius:
 				if accumulated > 0 and not _collecting:
+					get_viewport().set_input_as_handled()
 					_collect_rubies()

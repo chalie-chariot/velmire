@@ -7,6 +7,7 @@ var _time: float = 0.0
 var _base_points: PackedVector2Array = []
 const CONNECT_RANGE := 400.0  # 시너지 연결 가능 거리
 const COFFIN_PLACE_RANGE := 400.0  # 관 주변 노드 배치 가능 반경
+const REMOVAL_VALID_RANGE := 300.0  # 관/링라이트 유효 범위 (제거 카운트다운 방지)
 
 var radius: float = 28.0
 var is_dragging: bool = false
@@ -40,6 +41,9 @@ var spawn_cost: int = 0  # 드롭 시 재화 소모 (0이면 이미 소유)
 var _orbit_shown: bool = false  # 필드 첫 배치 시 1회만 orbit
 var _out_of_range: bool = false
 var _range_indicator: Panel = null
+var _removal_countdown: float = -1.0
+var _removal_tween: Tween = null
+var _is_being_dragged: bool = false
 
 # 강화
 var upgrade_level: int = 0
@@ -109,6 +113,8 @@ func _update_range_indicator(show: bool) -> void:
 	_range_indicator = indicator
 
 func _start_drag() -> void:
+	_is_being_dragged = true
+	cancel_removal_countdown()
 	_out_of_range = false
 	_update_range_indicator(false)
 	modulate = Color(1, 1, 1, 1)
@@ -201,11 +207,14 @@ func _input(event: InputEvent) -> void:
 		elif event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
 			if is_dragging:
 				is_dragging = false
+				_is_being_dragged = false
 				var drag_dist = get_viewport().get_mouse_position().distance_to(_drag_start_pos)
 				if drag_dist < DRAG_MIN_DIST:
 					queue_free()
 					return
 				_try_place_on_grid()
+				if is_placed:
+					_check_validity()
 				var main = get_tree().get_first_node_in_group("main")
 				if main and main.has_method("clear_all_node_selection"):
 					main.clear_all_node_selection()
@@ -236,6 +245,14 @@ func _input(event: InputEvent) -> void:
 			_shift_held = event.pressed
 
 func _process(delta: float) -> void:
+	if _removal_countdown >= 0.0 and not _is_being_dragged:
+		_removal_countdown -= delta
+		var ratio = _removal_countdown / 5.0
+		modulate = Color(1.0, ratio * 0.5 + 0.5, ratio * 0.5 + 0.5, 0.4 + ratio * 0.6)
+		if _removal_countdown <= 0.0:
+			_force_remove()
+			return
+
 	_time += delta
 	if _range_fade_timer > 0:
 		_range_fade_timer -= delta
@@ -486,30 +503,41 @@ func _try_place_on_grid() -> void:
 		_range_indicator.queue_free()
 		_range_indicator = null
 	modulate = Color(1, 1, 1, 1)
-
 	var mouse_pos: Vector2 = get_viewport().get_mouse_position()
+	print("_try_place_on_grid 호출됨")
+	print("mouse_pos: ", mouse_pos)
 
 	# 1순위: 인디케이터 슬롯 위인지 먼저 확인
 	var main = get_tree().get_first_node_in_group("main")
 	if main:
 		var slot_idx: int = main._get_slot_at(mouse_pos)
+		print("slot_idx: ", slot_idx)
 		if slot_idx >= 0:
+			print("슬롯에 등록됨")
 			main._register_to_slot(slot_idx, self)
 			return  # 그리드 배치 안함
 
 	# 2순위: 마우스가 인디케이터 영역(y > 880)이면 그리드 배치 안함
-	if mouse_pos.y > 880:
+	# 링라이트 범위 안이면 y > 880 예외 허용
+	main = get_tree().get_first_node_in_group("main")
+	var in_ring_light: bool = false
+	var lights = get_tree().get_nodes_in_group("ring_light")
+	for light in lights:
+		if global_position.distance_to(light.global_position) <= REMOVAL_VALID_RANGE:
+			in_ring_light = true
+			break
+	print("mouse_pos.y: ", mouse_pos.y)
+	if mouse_pos.y > 880 and not in_ring_light:
+		print("y > 880 → 슬롯 복귀")
 		_return_to_slot()
 		return
 
-	# 3순위: 관 범위 체크 (반경 400px)
-	var coffin = get_tree().get_first_node_in_group("coffin")
-	if coffin:
-		var coffin_center: Vector2 = coffin.global_position + coffin.size / 2
-		var dist: float = global_position.distance_to(coffin_center)
-		if dist > COFFIN_PLACE_RANGE:
-			_return_to_slot()
-			return
+	# 3순위: 유효 영역 체크 (관 300px 또는 링라이트 300px 내)
+	if not main or not main._is_valid_node_placement(global_position):
+		if main:
+			main._show_deny_popup("설치 범위를 벗어났습니다")
+		_return_to_slot()
+		return
 
 	# 4순위: 그리드 배치 시도
 	var grid = get_tree().get_first_node_in_group("heart_pulse")
@@ -517,6 +545,11 @@ func _try_place_on_grid() -> void:
 		_return_to_slot()
 		return
 	var cell: Vector2i = grid.world_to_grid(global_position)
+	var valid: bool = grid.is_valid_cell(cell.x, cell.y)
+	print("셀 좌표: ", cell)
+	print("is_valid_cell: ", valid)
+	print("is_cell_empty: ", grid.is_cell_empty(cell.x, cell.y) if valid else "범위 밖")
+	print("grid[row][col]: ", grid.grid[cell.y][cell.x] if valid else "범위 밖")
 	if grid.is_valid_cell(cell.x, cell.y) and grid.is_cell_empty(cell.x, cell.y):
 		if is_placed and grid_col >= 0 and grid_row >= 0:
 			grid.remove_node(grid_col, grid_row)
@@ -537,6 +570,47 @@ func _try_place_on_grid() -> void:
 			cm.set_last_placed(self)
 	else:
 		_return_to_slot()
+
+func start_removal_countdown() -> void:
+	if _removal_countdown >= 0.0:
+		return
+	_removal_countdown = 5.0
+
+
+func cancel_removal_countdown() -> void:
+	_removal_countdown = -1.0
+	modulate = Color(1.0, 1.0, 1.0, 1.0)
+
+
+func _force_remove() -> void:
+	var main = get_tree().get_first_node_in_group("main")
+	if main and main.has_method("remove_game_node"):
+		main.remove_game_node(self)
+	queue_free()
+
+
+func is_in_valid_area() -> bool:
+	var coffin = get_tree().get_first_node_in_group("coffin")
+	if coffin:
+		var center: Vector2 = coffin.global_position + coffin.size / 2.0
+		if global_position.distance_to(center) <= REMOVAL_VALID_RANGE:
+			return true
+	var lights = get_tree().get_nodes_in_group("ring_light")
+	for light in lights:
+		if not ("is_placed" in light and light.is_placed):
+			continue
+		var r: float = light.range_radius if "range_radius" in light else REMOVAL_VALID_RANGE
+		if global_position.distance_to(light.global_position) <= r:
+			return true
+	return false
+
+
+func _check_validity() -> void:
+	if is_in_valid_area():
+		cancel_removal_countdown()
+	else:
+		start_removal_countdown()
+
 
 func _return_to_slot() -> void:
 	var tween: Tween = create_tween()
