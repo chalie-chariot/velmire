@@ -50,6 +50,7 @@ var _buff_range_mult: float = 1.0
 var _buff_blood_mult: float = 1.0
 var _buff_tweens: Dictionary = {}
 var _pulse_bonus_active: bool = false
+var _pulse_bonus_multiplier: float = 2.0
 
 # 강화
 var upgrade_level: int = 0
@@ -77,6 +78,11 @@ func _ready() -> void:
 		add_to_group("game_nodes")
 	if node_type == "흡혈":
 		attack_cooldown = 2.0
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		print("노드 소멸: ", node_type, " / is_placed: ", is_placed, " / 위치: ", global_position)
+		print(get_stack())
 
 func _generate_base_points() -> void:
 	_base_points.clear()
@@ -127,15 +133,10 @@ func _start_drag() -> void:
 	_out_of_range = false
 	_update_range_indicator(false)
 	modulate = Color(1, 1, 1, 1)
-	var prev_col := grid_col
-	var prev_row := grid_row
-	if is_placed:
-		var grid = get_tree().get_first_node_in_group("heart_pulse")
-		if grid and prev_col >= 0 and prev_row >= 0:
-			grid.remove_node(prev_col, prev_row)
-		is_placed = false
-		grid_col = -1
-		grid_row = -1
+	# is_placed / grid_col / grid_row 건드리지 않음 — 그리드 점유만 임시 해제
+	var grid = get_tree().get_first_node_in_group("heart_pulse")
+	if grid and grid_col >= 0 and grid_row >= 0:
+		grid.remove_node(grid_col, grid_row)
 	is_dragging = true
 	_drag_start_pos = get_viewport().get_mouse_position()
 	_drag_offset = global_position - get_global_mouse_position()
@@ -219,6 +220,13 @@ func _input(event: InputEvent) -> void:
 				_is_being_dragged = false
 				var drag_dist = get_viewport().get_mouse_position().distance_to(_drag_start_pos)
 				if drag_dist < DRAG_MIN_DIST:
+					# 필드에 배치된 노드면 정보창만 표시
+					if is_placed:
+						var main = get_tree().get_first_node_in_group("main")
+						if main and main.has_method("show_node_info"):
+							main.show_node_info(self)
+						return
+					# 미배치 상태(슬롯에서)면 기존대로 제거
 					queue_free()
 					return
 				_try_place_on_grid()
@@ -533,6 +541,10 @@ func _try_place_on_grid() -> void:
 		return
 	var cell: Vector2i = grid.world_to_grid(global_position)
 	var valid: bool = grid.is_valid_cell(cell.x, cell.y)
+	# 4순위 그리드 배치 직전
+	print("배치 시도 노드: ", node_type, " / 현재 셀: (", grid_col, ",", grid_row, ")")
+	print("목표 셀: ", cell)
+	print("is_placed: ", is_placed)
 	print("셀 좌표: ", cell)
 	print("is_valid_cell: ", valid)
 	print("is_cell_empty: ", grid.is_cell_empty(cell.x, cell.y) if valid else "범위 밖")
@@ -577,19 +589,21 @@ func _force_remove() -> void:
 
 
 func is_in_valid_area() -> bool:
-	var coffin = get_tree().get_first_node_in_group("coffin")
-	if coffin:
-		var center: Vector2 = coffin.global_position + coffin.size / 2.0
-		if global_position.distance_to(center) <= REMOVAL_VALID_RANGE:
-			return true
+	# 관 범위 체크 삭제 — 어디든 유효
+	# 링라이트 만료 시에만 체크 (링라이트 범위 밖 노드 제거용으로만 사용)
 	var lights = get_tree().get_nodes_in_group("ring_light")
+	# 링라이트가 하나도 없으면 항상 유효
+	if lights.is_empty():
+		return true
+	# 링라이트 범위 안이면 유효
 	for light in lights:
 		if not ("is_placed" in light and light.is_placed):
 			continue
-		var r: float = light.range_radius if "range_radius" in light else REMOVAL_VALID_RANGE
-		if global_position.distance_to(light.global_position) <= r:
+		var dist = global_position.distance_to(light.global_position)
+		if dist <= 300.0:
 			return true
-	return false
+	# 링라이트 있는데 범위 밖이면 유효 (링라이트 만료 시에만 false 반환하도록)
+	return true
 
 
 func _check_validity() -> void:
@@ -603,6 +617,13 @@ func _return_to_slot() -> void:
 	var tween: Tween = create_tween()
 	tween.tween_property(self, "global_position", _slot_position, 0.2)\
 		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUART)
+	# 그리드에 배치돼 있었으면 복귀 시 재점유
+	if is_placed and grid_col >= 0 and grid_row >= 0:
+		tween.tween_callback(func():
+			var g = get_tree().get_first_node_in_group("heart_pulse")
+			if g and g.is_valid_cell(grid_col, grid_row) and g.is_cell_empty(grid_col, grid_row):
+				g.place_node(grid_col, grid_row, node_id)
+		)
 
 func _do_attack() -> bool:
 	match node_type:
@@ -647,7 +668,7 @@ func _attack_nearest_entity(damage: float) -> bool:
 					label.global_position + Vector2(0, -30), 0.6)
 				tween.parallel().tween_property(label, "modulate:a", 0.0, 0.6)
 				tween.tween_callback(label.queue_free)
-			nearest.take_damage(final_damage)
+			nearest.take_damage(final_damage, self)
 		return true
 	return false
 
@@ -724,6 +745,8 @@ func _get_effective_cooldown() -> float:
 
 func trigger_pulse_bonus() -> void:
 	_pulse_bonus_active = true
+	var cm = get_tree().get_first_node_in_group("connection_manager")
+	_pulse_bonus_multiplier = 2.5 if (cm and cm.get("_coffin_pulse_boost")) else 2.0
 	var tw = create_tween()
 	tw.tween_property(self, "modulate", Color(2.0, 2.0, 2.0, 1.0), 0.08)
 	tw.tween_property(self, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.2)
@@ -732,7 +755,7 @@ func trigger_pulse_bonus() -> void:
 func _get_final_damage(base_damage: float) -> float:
 	var dmg: float = base_damage * _buff_damage_mult
 	if _pulse_bonus_active:
-		dmg *= 2.0
+		dmg *= _pulse_bonus_multiplier
 		_pulse_bonus_active = false
 	return dmg
 

@@ -262,7 +262,7 @@ func _draw() -> void:
 		draw_colored_polygon(PackedVector2Array([tl, tr_h, br_h, bl]),
 			Color(1.0, 0.15, 0.15, _hp_bar_alpha))
 
-func take_damage(amount: float) -> void:
+func take_damage(amount: float, source: Node = null) -> void:
 	hp -= amount
 	_hp_bar_alpha = 1.0
 	_hp_bar_timer = 2.0
@@ -276,6 +276,8 @@ func take_damage(amount: float) -> void:
 		if main:
 			main.trigger_hitstop(0.06)
 			main.on_entity_killed()
+			if source and source.get_meta("coffin_synergy", "") == "heal" and main.has_method("heal_coffin"):
+				main.heal_coffin(2)
 		_spawn_death_effect()
 		_drop_blood()
 		remove_from_group("blood_entities")

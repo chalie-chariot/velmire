@@ -1,6 +1,8 @@
 extends Node2D
 
 var _connections: Array = []
+var _coffin_connections: Array = []
+var _coffin_pulse_boost: bool = false
 var _pending: Node2D = null
 var _selected: Node2D = null  # 일반 클릭으로 선택된 노드 (SHIFT 누르면 범위 표시)
 var _flow_time: float = 0.0
@@ -124,10 +126,11 @@ func _spawn_connect_effect(from_node: Node2D, to_node: Node2D) -> void:
 	)
 
 func disconnect_from(node: Node2D) -> void:
-	# A 노드 우클릭 시 해당 노드의 모든 연결 해제
+	# A 노드 우클릭 시 해당 노드의 모든 연결 해제 (노드-노드 + 관-노드)
 	_connections = _connections.filter(func(conn):
 		return conn.from != node and conn.to != node
 	)
+	_disconnect_from_coffin(node)
 	node.is_pending_connection = false
 	node._is_first_selected = false
 	if _pending == node:
@@ -189,7 +192,22 @@ func _process(delta: float) -> void:
 		_synergy_flash_time += delta
 		if _synergy_flash_time > 0.4:
 			_synergy_flashing = false
-	if _synergy_flashing or not _connections.is_empty() or _pending:
+	# 관-노드 연결선 위치 갱신
+	var main = get_tree().get_first_node_in_group("main")
+	var entity_layer = main.get_node_or_null("EntityLayer") if main else null
+	var coffin = get_tree().get_first_node_in_group("coffin")
+	var coffin_center := Vector2.ZERO
+	if coffin:
+		coffin_center = coffin.global_position + Vector2(coffin.size.x / 2.0, coffin.size.y / 2.0)
+	for node in _coffin_connections:
+		if not is_instance_valid(node):
+			continue
+		if node.has_meta("coffin_line"):
+			var line = node.get_meta("coffin_line")
+			if is_instance_valid(line) and entity_layer:
+				line.set_point_position(0, entity_layer.to_local(node.global_position))
+				line.set_point_position(1, entity_layer.to_local(coffin_center))
+	if _synergy_flashing or not _connections.is_empty() or _pending or not _coffin_connections.is_empty():
 		queue_redraw()
 
 func _draw() -> void:
@@ -284,3 +302,97 @@ func _draw() -> void:
 		var b: Vector2 = to_local(get_global_mouse_position())
 		var pc: Color = _pending.node_color
 		draw_line(a, b, Color(pc.r, pc.g, pc.b, 0.4), 2.0)
+
+func try_connect_to_coffin(node: Node) -> void:
+	if node.get("upgrade_level") == null or node.upgrade_level < 2:
+		var main = get_tree().get_first_node_in_group("main")
+		if main and main.has_method("_show_deny_popup"):
+			main._show_deny_popup("Lv.2 이상 노드만 연결 가능합니다")
+		return
+
+	if node in _coffin_connections:
+		_disconnect_from_coffin(node)
+		return
+
+	if _coffin_connections.size() >= 3:
+		var main = get_tree().get_first_node_in_group("main")
+		if main and main.has_method("_show_deny_popup"):
+			main._show_deny_popup("관 연결은 최대 3개입니다")
+		return
+
+	_coffin_connections.append(node)
+	_apply_coffin_synergy(node)
+	_draw_coffin_connection_line(node)
+
+func _disconnect_from_coffin(node: Node) -> void:
+	_coffin_connections.erase(node)
+	_remove_coffin_synergy(node)
+	_remove_coffin_connection_line(node)
+
+func _apply_coffin_synergy(node: Node) -> void:
+	var type = node.get("node_type")
+	match type:
+		"흡혈":
+			node.set_meta("coffin_synergy", "heal")
+		"결계":
+			node.set_meta("coffin_synergy", "barrier")
+			var main = get_tree().get_first_node_in_group("main")
+			if main and main.has_method("_activate_coffin_barrier"):
+				main._activate_coffin_barrier()
+		"증폭":
+			node.set_meta("coffin_synergy", "pulse")
+			_coffin_pulse_boost = true
+			var hp = get_tree().get_first_node_in_group("heart_pulse")
+			if hp and hp.has_method("_activate_coffin_pulse_boost"):
+				hp._activate_coffin_pulse_boost()
+
+func _remove_coffin_synergy(node: Node) -> void:
+	var type = node.get("node_type")
+	match type:
+		"결계":
+			var any_barrier_left = false
+			for n in _coffin_connections:
+				if n.get("node_type") == "결계":
+					any_barrier_left = true
+					break
+			if not any_barrier_left:
+				var main = get_tree().get_first_node_in_group("main")
+				if main and main.has_method("_deactivate_coffin_barrier"):
+					main._deactivate_coffin_barrier()
+		"증폭":
+			var any_pulse_left = false
+			for n in _coffin_connections:
+				if n.get("node_type") == "증폭":
+					any_pulse_left = true
+					break
+			if not any_pulse_left:
+				_coffin_pulse_boost = false
+				var hp = get_tree().get_first_node_in_group("heart_pulse")
+				if hp and hp.has_method("_deactivate_coffin_pulse_boost"):
+					hp._deactivate_coffin_pulse_boost()
+	node.remove_meta("coffin_synergy")
+
+func _draw_coffin_connection_line(node: Node) -> void:
+	var line = Line2D.new()
+	line.width = 2.5
+	line.default_color = Color(1.0, 0.75, 0.2, 0.7)
+	var main = get_tree().get_first_node_in_group("main")
+	if not main:
+		return
+	var entity_layer = main.get_node_or_null("EntityLayer")
+	if not entity_layer:
+		return
+	entity_layer.add_child(line)
+	line.add_point(entity_layer.to_local(node.global_position))
+	var coffin = get_tree().get_first_node_in_group("coffin")
+	if coffin:
+		var coffin_center = coffin.global_position + Vector2(coffin.size.x / 2.0, coffin.size.y / 2.0)
+		line.add_point(entity_layer.to_local(coffin_center))
+	node.set_meta("coffin_line", line)
+
+func _remove_coffin_connection_line(node: Node) -> void:
+	if node.has_meta("coffin_line"):
+		var line = node.get_meta("coffin_line")
+		if is_instance_valid(line):
+			line.queue_free()
+		node.remove_meta("coffin_line")

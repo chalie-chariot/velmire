@@ -107,14 +107,15 @@ func _show_blood_bonus_popup(amount: int) -> void:
 		dot.modulate = Color(1.0, 0.9, 0.1, 0.0)
 		dot.z_index = 100
 		dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		dot.position = base_pos + Vector2(randf_range(-15.0, 15.0), 20)
+		# 혈액 카운터 아래가 아닌 위에서 시작
+		dot.position = base_pos + Vector2(randf_range(-15.0, 15.0), -20)
 		canvas_layer.add_child(dot)
 
 		var dtw = create_tween()
 		dtw.tween_interval(i * 0.06)
 		dtw.set_parallel(true)
 		dtw.tween_property(dot, "modulate:a", 1.0, 0.15).set_ease(Tween.EASE_OUT)
-		dtw.tween_property(dot, "position:y", dot.position.y - 50, 0.5).set_ease(Tween.EASE_OUT)
+		dtw.tween_property(dot, "position:y", dot.position.y - 40, 0.5).set_ease(Tween.EASE_OUT)
 		dtw.tween_property(dot, "modulate:a", 0.0, 0.2).set_delay(0.35)
 		var dcb = func(): dot.queue_free()
 		dtw.tween_callback(dcb).set_delay(0.5)

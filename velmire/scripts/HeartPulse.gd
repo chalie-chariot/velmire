@@ -24,6 +24,7 @@ var _coffin_center: Vector2 = Vector2(960, 540)
 var grid: Array = []
 var _pulse_time: float = 0.0
 var _pulse_radius: float = 0.0
+var _coffin_pulse_boost: bool = false
 var _pulse_alpha: float = 0.0
 var _pulsing: bool = false
 var _max_pulse_radius: float = 1200.0
@@ -54,6 +55,12 @@ func _process(delta: float) -> void:
 		_pulse_alpha = pow(1.0 - progress, 1.5)
 		_check_pulse_hit_ring_lights()
 		if _pulse_radius >= _max_pulse_radius:
+			print("파동 종료 — hit_lights 개수: ", _hit_lights.size())
+			for h in _hit_lights:
+				if is_instance_valid(h):
+					print("hit 노드: ", h.name, " / 유효: true")
+				else:
+					print("hit 노드: 이미 소멸됨")
 			_pulsing = false
 			_pulse_alpha = 0.0
 			_hit_lights.clear()
@@ -77,9 +84,17 @@ func _update_pulse_interval() -> void:
 		new_interval = PULSE_INTERVAL_DANGER
 	else:
 		new_interval = PULSE_INTERVAL_NORMAL
+	if _coffin_pulse_boost:
+		new_interval *= 0.8
 	if new_interval != _current_interval:
 		_current_interval = new_interval
 		_on_interval_changed()
+
+func _activate_coffin_pulse_boost() -> void:
+	_coffin_pulse_boost = true
+
+func _deactivate_coffin_pulse_boost() -> void:
+	_coffin_pulse_boost = false
 
 func _on_interval_changed() -> void:
 	var coffin = get_tree().get_first_node_in_group("coffin")
@@ -109,6 +124,7 @@ func _check_pulse_hit_ring_lights() -> void:
 			continue
 		var ndist: float = _coffin_center.distance_to(node.global_position)
 		if abs(_pulse_radius - ndist) <= PULSE_HIT_TOLERANCE:
+			print("파동 히트 노드: ", node.name, " / node_type: ", node.get("node_type"), " / is_placed: ", node.get("is_placed"), " / is_dragging: ", node.get("is_dragging"))
 			_hit_lights.append(node)
 			if node.has_method("trigger_pulse_bonus"):
 				node.trigger_pulse_bonus()

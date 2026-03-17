@@ -167,6 +167,7 @@ var _map_vignette_overlay: ColorRect = null
 var _tooltip_node: Control = null
 var _tooltip_tween: Tween = null
 var _node_info_panel: Control = null
+var _coffin_barrier_active: bool = false
 const _tooltip_width: float = 690.0
 const _tooltip_height: float = 180.0
 
@@ -1493,6 +1494,8 @@ func _process(delta: float) -> void:
 	if _is_game_over:
 		_apply_shake(delta)
 		return
+	if _coffin_barrier_active:
+		_check_coffin_barrier()
 	if _combo_count > 0:
 		_combo_timer -= delta
 		if _combo_timer <= 0:
@@ -1864,6 +1867,7 @@ func heal_coffin(amount: float) -> void:
 	var actual: float = min(amount, coffin_max_hp - coffin_hp)
 	var old_ratio: float = coffin_hp / coffin_max_hp
 	coffin_hp += actual
+	coffin_hp = min(coffin_hp, coffin_max_hp)
 	var new_ratio: float = coffin_hp / coffin_max_hp
 
 	_show_hp_bar(false)
@@ -1883,9 +1887,24 @@ func heal_coffin(amount: float) -> void:
 		heal_bar.offset_right = 0.0
 	)
 
-	var tween: Tween = create_tween()
-	tween.tween_property(_coffin_rect, "scale", Vector2(1.15, 1.15), 0.1).set_ease(Tween.EASE_OUT)
-	tween.tween_property(_coffin_rect, "scale", Vector2(1.0, 1.0), 0.2).set_ease(Tween.EASE_IN)
+	var tw = create_tween()
+	tw.tween_property(_coffin_rect, "modulate", Color(1.0, 0.5, 0.5, 1.0), 0.1).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_coffin_rect, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.2).set_ease(Tween.EASE_IN)
+
+func _activate_coffin_barrier() -> void:
+	_coffin_barrier_active = true
+
+func _deactivate_coffin_barrier() -> void:
+	_coffin_barrier_active = false
+
+func _check_coffin_barrier() -> void:
+	var coffin_center = _coffin_rect.global_position + _coffin_rect.size / 2.0
+	var entities = get_tree().get_nodes_in_group("blood_entities")
+	for entity in entities:
+		var dist = entity.global_position.distance_to(coffin_center)
+		if dist <= 260.0 and dist >= 240.0:
+			if entity.has_method("apply_slow"):
+				entity.apply_slow(0.5, 1.0)
 
 func _trigger_coffin_push(hit_pos: Vector2) -> void:
 	var coffin_center: Vector2 = _coffin_rect.global_position + _coffin_rect.size / 2
@@ -2101,13 +2120,24 @@ func _escape_success() -> void:
 	$CanvasLayer.add_child(label4)
 
 func _input(event: InputEvent) -> void:
-	# 좌클릭: 노드 정보 패널 밖 클릭 시 닫기
+	# 좌클릭: 노드 정보 패널 밖 클릭 시 닫기 / SHIFT+관 클릭 시 관-노드 연결
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if _node_info_panel and is_instance_valid(_node_info_panel):
 			var panel_rect = _node_info_panel.get_global_rect()
 			var mouse_pos = get_viewport().get_mouse_position()
 			if not panel_rect.has_point(mouse_pos):
 				_close_node_info_panel()
+
+		# SHIFT + 관 클릭 시 관-노드 시너지 연결
+		if Input.is_key_pressed(KEY_SHIFT):
+			var coffin = $CanvasLayer/Coffin
+			var coffin_rect = Rect2(coffin.global_position, coffin.size)
+			if coffin_rect.has_point(get_viewport().get_mouse_position()):
+				var cm = get_tree().get_first_node_in_group("connection_manager")
+				var pending = cm.get_pending() if cm else null
+				if cm and pending and cm.has_method("try_connect_to_coffin"):
+					cm.try_connect_to_coffin(pending)
+					get_viewport().set_input_as_handled()
 
 	# 우클릭: 시너지 연결 대기 중이면 취소, 아니면 노드 제거 (_input에서 처리해 GUI보다 먼저)
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
