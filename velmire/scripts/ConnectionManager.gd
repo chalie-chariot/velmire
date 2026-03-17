@@ -304,7 +304,9 @@ func _draw() -> void:
 		draw_line(a, b, Color(pc.r, pc.g, pc.b, 0.4), 2.0)
 
 func try_connect_to_coffin(node: Node) -> void:
-	if node.get("upgrade_level") == null or node.upgrade_level < 2:
+	# upgrade_level 0 = 기본 / 1 = Lv.2 / 2 = Lv.3
+	# Lv.2 = upgrade_level 1 이상부터 허용
+	if node.get("upgrade_level") == null or node.upgrade_level < 1:
 		var main = get_tree().get_first_node_in_group("main")
 		if main and main.has_method("_show_deny_popup"):
 			main._show_deny_popup("Lv.2 이상 노드만 연결 가능합니다")
