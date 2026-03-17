@@ -3,6 +3,7 @@ extends Node
 signal resource_changed(type: String, new_value: Variant)
 signal blood_changed(new_value: int)
 signal special_changed(new_value: float)
+signal chip_changed(new_value: int)
 
 var blood: int = 50  # 테스트용 초기값
 var special: float = 0.0
@@ -15,6 +16,7 @@ var total_kills: int = 0
 var best_viewers: int = 0
 
 var ruby: int = 100  # 블러디아 루비 (테스트용 초기값)
+var chip: int = 0    # 블러디아 칩
 
 
 func add_ruby(amount: int) -> void:
@@ -32,6 +34,11 @@ func spend_ruby(amount: int) -> bool:
 	if main and main.has_method("update_ruby_ui"):
 		main.update_ruby_ui(ruby)
 	return true
+
+
+func add_chip(amount: int) -> void:
+	chip += amount
+	chip_changed.emit(chip)
 
 
 func _ready() -> void:

@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://p41tdapjy2x8"]
+
+[ext_resource type="Script" uid="uid://b8xc7qtukb57m" path="res://scripts/RubyGem.gd" id="1_gem"]
+[ext_resource type="Shader" uid="uid://dvixqwbtajtxo" path="res://shaders/ruby_gem.gdshader" id="2_shader"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_gem"]
+shader = ExtResource("2_shader")
+shader_parameter/time_val = 0.0
+shader_parameter/glow_intensity = 0.0
+
+[node name="RubyGem" type="Node2D" unique_id=413313270]
+script = ExtResource("1_gem")
+
+[node name="GemRect" type="ColorRect" parent="." unique_id=746867055]
+material = SubResource("ShaderMaterial_gem")
+offset_left = -18.0
+offset_top = -24.0
+offset_right = 18.0
+offset_bottom = 24.0

@@ -34,7 +34,7 @@ var _hp_tween: Tween
 var _damage_tween: Tween
 var _coffin_push_tween: Tween
 const _coffin_base_pos: Vector2 = Vector2(920.0, 480.0)
-var _left_open: bool = false
+var left_open: bool = false
 var _right_open: bool = false
 var spawn_timer: float = 0.0
 var spawn_interval: float = 3.0
@@ -145,10 +145,12 @@ func _ready() -> void:
 	ResourceManager.blood_changed.connect(_on_blood_changed)
 	ResourceManager.blood_changed.connect(update_blood_ui)
 	ResourceManager.special_changed.connect(_on_special_changed)
+	ResourceManager.chip_changed.connect(_on_chip_changed)
 	_on_blood_changed(ResourceManager.blood)
 	_displayed_blood = ResourceManager.blood
 	update_blood_ui(ResourceManager.blood)
 	_on_special_changed(ResourceManager.special)
+	_on_chip_changed(ResourceManager.chip)
 	_init_viewers()
 	update_ruby_ui(ResourceManager.ruby)
 	var viewer_bar: Control = $CanvasLayer/RightPanel/ViewerBar
@@ -262,8 +264,10 @@ func hide_tooltip() -> void:
 	_tooltip.visible = false
 
 func _spawn_start_nodes() -> void:
+	# 기본 노드 3종 (흡혈/결계/증폭) 배치
 	var node_scene = preload("res://scenes/GameNode.tscn")
 	var grid = $EntityLayer/HeartPulse
+	var coffin_center: Vector2 = _coffin_rect.position + _coffin_rect.size / 2
 
 	var start_nodes = [
 		{"id": "absorb", "type": "흡혈", "color": Color(0.9, 0.1, 0.1)},
@@ -277,21 +281,29 @@ func _spawn_start_nodes() -> void:
 		node.node_type = data.type
 		node.node_color = data.color
 		node.is_starter_node = true
-		# 관 좌우에 배치 (화면 정중앙과 동일한 수직선)
-		var coffin_center: Vector2 = _coffin_rect.position + _coffin_rect.size / 2
-		var offset_x: float = -120.0 if i == 0 else 120.0
+		var offset_x: float = -120.0 if i == 0 else 120.0  # 좌(-120), 우(120)
 		var pos: Vector2 = Vector2(coffin_center.x + offset_x, coffin_center.y)
 		node.global_position = pos
 		node._slot_position = pos
-		# 그리드에 등록 + is_placed 설정 (SHIFT 시너지 연결 가능)
 		var cell: Vector2i = grid.world_to_grid(pos)
 		if grid.is_valid_cell(cell.x, cell.y) and grid.is_cell_empty(cell.x, cell.y):
 			grid.place_node(cell.x, cell.y, node.node_id)
 			node.is_placed = true
 			node.grid_col = cell.x
 			node.grid_row = cell.y
-			node._orbit_shown = true  # 이동 시 orbit 재생 방지
+			node._orbit_shown = true
 		$EntityLayer.add_child(node)
+
+	# RubinaTap 1개 배치
+	var rubina_scene = load("res://scenes/RubinaTap.tscn")
+	if rubina_scene != null:
+		var tap = rubina_scene.instantiate()
+		get_tree().current_scene.add_child(tap)
+		var coffins = get_tree().get_nodes_in_group("coffin")
+		if coffins.size() > 0:
+			tap.position = coffins[0].global_position + Vector2(-200, 0)
+		else:
+			tap.position = Vector2(720, 480)
 
 func _build_hint_dots() -> void:
 	# 기존 자식 전부 제거
@@ -1678,11 +1690,11 @@ func _input(event: InputEvent) -> void:
 
 	if event is InputEventKey and event.pressed:
 		if event.keycode == KEY_Q:
-			if _left_open:
+			if left_open:
 				_slide_left_close()
 			else:
 				_slide_left_open()
-			_left_open = !_left_open
+			left_open = !left_open
 
 		if event.keycode == KEY_E:
 			if _right_open:
@@ -2275,9 +2287,9 @@ func _recall_slots_to_panel() -> void:
 	if recalled_count > 0:
 		_build_owned_nodes()
 		_slots_in_panel = true
-		if not _left_open:
+		if not left_open:
 			_slide_left_open()
-			_left_open = true
+			left_open = true
 		_show_deny_popup("노드 %d개 회수됨" % recalled_count)
 	else:
 		_show_deny_popup("회수할 노드 없음")
@@ -2351,11 +2363,11 @@ func _on_right_tab_gui_input(event: InputEvent) -> void:
 		_on_right_tab_clicked()
 
 func _on_left_tab_clicked() -> void:
-	if _left_open:
+	if left_open:
 		_slide_left_close()
 	else:
 		_slide_left_open()
-	_left_open = !_left_open
+	left_open = !left_open
 
 func _on_right_tab_clicked() -> void:
 	if _right_open:
@@ -2405,9 +2417,14 @@ func _on_blood_changed(new_value: int) -> void:
 		_left_blood_label.text = str(new_value)
 
 func _on_special_changed(new_value: float) -> void:
+	var special_value: Label = $CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox.get_node_or_null("SpecialRow/SpecialValue")
+	if special_value:
+		special_value.text = str(int(new_value))
+
+func _on_chip_changed(new_value: int) -> void:
 	var chip_value: Label = $CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/ChipRow/ChipValue
 	if chip_value:
-		chip_value.text = str(int(new_value))
+		chip_value.text = str(new_value)
 	var row: Control = $CanvasLayer/LeftPanel/Card1_Resources/ResourcesVBox/ChipRow
 	row.modulate = Color(1, 1, 1, 0.5 if new_value <= 0 else 1.0)
 
