@@ -5,7 +5,7 @@ signal blood_changed(new_value: int)
 signal special_changed(new_value: float)
 signal chip_changed(new_value: int)
 
-var blood: int = 0
+var blood: int = 100  # 테스트용 초기값
 var special: float = 0.0
 var node_fragments: int = 0
 var difficulty: int = 0  # 0단계부터 시작

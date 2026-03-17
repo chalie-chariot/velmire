@@ -124,6 +124,7 @@ const TOOLTIP_RUBINA_TAP = {
 var _hint_hiding: bool = false
 var _hint_hide_tweens: Array = []
 var _unlock_animation_playing: bool = false  # 해금 애니 중엔 인디케이터 숨기지 않음
+var _unlock_in_progress: bool = false  # 슬롯 연속 해금 시 중복 실행 방지
 var _indicator_was_hidden: bool = true
 var _pending_spawn_index: int = -1  # 재화 차감됐지만 아직 스폰 안된 슬롯 (중복 방지)
 var _slots_in_panel: bool = false  # X키로 슬롯이 Q 패널로 회수된 상태
@@ -278,19 +279,16 @@ func clear_vignette_bright_area(area_index: int) -> void:
 		mat.set_shader_parameter("bright_radius_1", 0.0)
 
 func _register_ring_light(ring: Node2D) -> void:
-	print("링라이트 등록 위치:", ring.global_position)
 	var lights = get_tree().get_nodes_in_group("ring_light")
 	var placed: Array = []
 	for l in lights:
 		if "is_placed" in l and l.is_placed:
 			placed.append(l)
 	var idx = placed.size() - 1
-	print("설치 인덱스:", idx)
 	if "shader_index" in ring:
 		ring.shader_index = idx
 
 	if _map_vignette_overlay and _map_vignette_overlay.material:
-		print("셰이더 파라미터 설정 시도")
 		if idx == 0:
 			_map_vignette_overlay.material.set_shader_parameter(
 				"bright_center_0", ring.global_position)
@@ -298,8 +296,6 @@ func _register_ring_light(ring: Node2D) -> void:
 				"bright_radius_0", ring.range_radius)
 			_map_vignette_overlay.material.set_shader_parameter(
 				"bright_strength_0", 2.0)
-			print("bright_center_0:", ring.global_position)
-			print("bright_radius_0:", ring.range_radius)
 		elif idx == 1:
 			_map_vignette_overlay.material.set_shader_parameter(
 				"bright_center_1", ring.global_position)
@@ -307,8 +303,6 @@ func _register_ring_light(ring: Node2D) -> void:
 				"bright_radius_1", ring.range_radius)
 			_map_vignette_overlay.material.set_shader_parameter(
 				"bright_strength_1", 2.0)
-	else:
-		print("셰이더 없음")
 	_build_owned_nodes()
 
 func _spawn_ring_light() -> void:
@@ -676,9 +670,13 @@ func _build_hint_dots() -> void:
 		_dots_container.add_child(slot)
 
 	# BloodCounter (HintArea와 무관하게 항상 표시 → CanvasLayer 직속)
-	var old_bc = $CanvasLayer.get_node_or_null("BloodCounter")
-	if old_bc:
-		old_bc.queue_free()
+	print("BloodCounter 생성 / 기존 개수: ", $CanvasLayer.get_children().filter(
+		func(c): return c.name == "BloodCounter"
+	).size())
+	var existing = $CanvasLayer.get_node_or_null("BloodCounter")
+	if existing:
+		existing.queue_free()
+		await get_tree().process_frame
 	var blood_counter: Label = Label.new()
 	blood_counter.name = "BloodCounter"
 	blood_counter.add_theme_font_size_override("font_size", 24)
@@ -780,28 +778,21 @@ func _highlight_slot(index: int, on: bool) -> void:
 const PLACEMENT_VALID_RANGE: float = 300.0  # 관/링라이트 유효 배치 반경 (RingLight.RANGE_RADIUS와 동일)
 
 func _is_valid_node_placement(pos: Vector2) -> bool:
-	print("노드 배치 위치: ", pos)
 	# 1. 관 중심 기준 범위 체크
 	var coffin = get_tree().get_first_node_in_group("coffin")
 	if coffin:
 		var coffin_center: Vector2 = coffin.global_position + coffin.size / 2.0
 		var dist: float = pos.distance_to(coffin_center)
-		print("관까지 거리: ", dist)
 		if dist <= PLACEMENT_VALID_RANGE:
-			print("관 범위 내 → 통과")
 			return true
 	# 2. 링라이트 범위 체크
 	var lights = get_tree().get_nodes_in_group("ring_light")
-	print("링라이트 개수: ", lights.size())
 	for light in lights:
 		var dist: float = pos.distance_to(light.global_position)
-		print("링라이트 거리: ", dist, " / 위치: ", light.global_position)
 		if ("is_placed" in light and light.is_placed):
 			var r: float = light.range_radius if "range_radius" in light else PLACEMENT_VALID_RANGE
 			if dist <= r:
-				print("링라이트 범위 내 → 통과")
 				return true
-	print("모두 실패 → 배치 거부")
 	return false
 
 func remove_game_node(node: Node2D) -> void:
@@ -1184,10 +1175,58 @@ func _show_slot_full_guide() -> void:
 		htw.tween_property(hint, "modulate", Color(1.5, 1.3, 0.2, 1.0), 0.15)
 		htw.tween_property(hint, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.3)
 
+func _show_blood_bonus_popup(amount: int) -> void:
+	var canvas_layer = $CanvasLayer
+	var blood_counter = canvas_layer.get_node_or_null("BloodCounter")
+	if not blood_counter:
+		return
+
+	var base_pos = blood_counter.get_global_transform_with_canvas().origin
+
+	var bonus_label = Label.new()
+	bonus_label.text = "+" + str(amount)
+	bonus_label.add_theme_font_size_override("font_size", 20)
+	bonus_label.modulate = Color(1.0, 0.85, 0.1, 0.0)
+	bonus_label.z_index = 100
+	bonus_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bonus_label.position = Vector2(
+		base_pos.x + blood_counter.size.x + 5,
+		base_pos.y)
+	canvas_layer.add_child(bonus_label)
+
+	# 순차 tween (parallel 없이)
+	var ltw = create_tween()
+	# 페이드인 + 위로
+	ltw.tween_property(bonus_label, "modulate:a", 1.0, 0.2).set_ease(Tween.EASE_OUT)
+	ltw.tween_property(bonus_label, "position:y", base_pos.y - 35, 0.4).set_ease(Tween.EASE_OUT)
+	# 잠깐 유지
+	ltw.tween_interval(0.2)
+	# 페이드아웃
+	ltw.tween_property(bonus_label, "modulate:a", 0.0, 0.25)
+	# 제거
+	var lcb = func(): bonus_label.queue_free()
+	ltw.tween_callback(lcb)
+
+var _deny_popup_tween: Tween = null
+
 func _show_deny_popup(text: String) -> void:
 	var old = $CanvasLayer.get_node_or_null("DenyPopup")
-	if old:
-		old.queue_free()
+	if old and old is Label:
+		# 기존 팝업 재사용 — 텍스트 겹침 방지
+		if _deny_popup_tween and _deny_popup_tween.is_valid():
+			_deny_popup_tween.kill()
+		old.text = text
+		old.modulate.a = 1.0
+		old.position.y = _coffin_base_pos.y - 80
+		old.visible = true
+		_deny_popup_tween = old.create_tween()
+		_deny_popup_tween.tween_property(old, "position:y", _coffin_base_pos.y - 100, 0.2).set_ease(Tween.EASE_OUT)
+		_deny_popup_tween.tween_interval(1.5)
+		_deny_popup_tween.tween_property(old, "position:y", _coffin_base_pos.y - 180, 0.3).set_ease(Tween.EASE_IN)
+		_deny_popup_tween.tween_property(old, "modulate:a", 0.0, 0.15)
+		_deny_popup_tween.tween_callback(old.queue_free)
+		_deny_popup_tween.tween_callback(func(): _deny_popup_tween = null)
+		return
 
 	var label: Label = Label.new()
 	label.name = "DenyPopup"
@@ -1199,12 +1238,13 @@ func _show_deny_popup(text: String) -> void:
 	label.position = Vector2(_coffin_base_pos.x - 200, _coffin_base_pos.y - 80)
 	$CanvasLayer.add_child(label)
 
-	var tween: Tween = label.create_tween()
-	tween.tween_property(label, "position:y", _coffin_base_pos.y - 100, 0.2).set_ease(Tween.EASE_OUT)
-	tween.tween_interval(1.5)
-	tween.tween_property(label, "position:y", _coffin_base_pos.y - 180, 0.3).set_ease(Tween.EASE_IN)
-	tween.tween_property(label, "modulate:a", 0.0, 0.15)
-	tween.tween_callback(label.queue_free)
+	_deny_popup_tween = label.create_tween()
+	_deny_popup_tween.tween_property(label, "position:y", _coffin_base_pos.y - 100, 0.2).set_ease(Tween.EASE_OUT)
+	_deny_popup_tween.tween_interval(1.5)
+	_deny_popup_tween.tween_property(label, "position:y", _coffin_base_pos.y - 180, 0.3).set_ease(Tween.EASE_IN)
+	_deny_popup_tween.tween_property(label, "modulate:a", 0.0, 0.15)
+	_deny_popup_tween.tween_callback(label.queue_free)
+	_deny_popup_tween.tween_callback(func(): _deny_popup_tween = null)
 
 func _shake_slot(index: int) -> void:
 	var slot = _dots_container.get_child(index)
@@ -1283,6 +1323,8 @@ func _get_slot_unlock_cost() -> int:
 	return 0
 
 func _unlock_next_slot() -> void:
+	if _unlock_in_progress:
+		return
 	var cost: int = _get_slot_unlock_cost()
 	if cost <= 0:
 		return
@@ -1297,6 +1339,7 @@ func _unlock_next_slot() -> void:
 		tween.tween_property(slot, "position:x", ox, 0.03)
 		return
 
+	_unlock_in_progress = true
 	ResourceManager.spend_blood(cost)
 	_unlocked_slots += 1
 
@@ -1358,6 +1401,7 @@ func _unlock_next_slot() -> void:
 
 	await get_tree().create_timer(0.45).timeout
 	_unlock_animation_playing = false
+	_unlock_in_progress = false
 	_update_slot_count_label()
 
 func _get_chat_manager() -> Node:
@@ -2739,7 +2783,6 @@ func _burst_upgrade(node: Node2D, color: Color) -> void:
 	burst.chain().tween_property(node, "scale", Vector2(1.0, 1.0), 0.65).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 
 func _recall_slots_to_panel() -> void:
-	print("회수 시점 _hint_area.position:", _hint_area.position)
 	if _slots_in_panel:
 		_show_deny_popup("이미 회수했습니다 [X]")
 		return
@@ -2906,24 +2949,28 @@ func _on_blood_counter_tween_update(val: float) -> void:
 func _animate_blood_counter(amount: float, do_scale: bool) -> void:
 	if not _blood_counter_ref or not is_instance_valid(_blood_counter_ref):
 		return
+
+	# 기존 tween 킬 + displayed_blood 즉시 동기화
 	if _blood_anim_tween:
 		_blood_anim_tween.kill()
+		_blood_anim_tween = null
+
+	# displayed_blood 를 현재 표시 중인 값으로 고정
+	if _blood_counter_ref and is_instance_valid(_blood_counter_ref):
+		_displayed_blood = float(_blood_counter_ref.text.replace("🩸 ", "").to_float())
 
 	_blood_counter_ref.pivot_offset = _blood_counter_ref.size / 2
 	_blood_anim_tween = create_tween()
-	_blood_anim_tween.set_parallel(true)
 	_blood_anim_tween.tween_method(
 		_on_blood_counter_tween_update, _displayed_blood, amount, 0.35
-	).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	)
 	if do_scale:
 		_blood_anim_tween.tween_property(
 			_blood_counter_ref, "scale", Vector2(1.3, 1.3), 0.15
-		).set_ease(Tween.EASE_OUT)
-	_blood_anim_tween.set_parallel(false)
-	if do_scale:
+		)
 		_blood_anim_tween.tween_property(
-			_blood_counter_ref, "scale", Vector2(1.0, 1.0), 0.2
-		).set_ease(Tween.EASE_IN).set_delay(0.15)
+			_blood_counter_ref, "scale", Vector2(1.0, 1.0), 0.1
+		)
 
 func update_blood_ui(amount: float) -> void:
 	_blood_label.visible = false

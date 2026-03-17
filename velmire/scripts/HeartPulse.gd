@@ -55,12 +55,6 @@ func _process(delta: float) -> void:
 		_pulse_alpha = pow(1.0 - progress, 1.5)
 		_check_pulse_hit_ring_lights()
 		if _pulse_radius >= _max_pulse_radius:
-			print("파동 종료 — hit_lights 개수: ", _hit_lights.size())
-			for h in _hit_lights:
-				if is_instance_valid(h):
-					print("hit 노드: ", h.name, " / 유효: true")
-				else:
-					print("hit 노드: 이미 소멸됨")
 			_pulsing = false
 			_pulse_alpha = 0.0
 			_hit_lights.clear()
@@ -124,7 +118,6 @@ func _check_pulse_hit_ring_lights() -> void:
 			continue
 		var ndist: float = _coffin_center.distance_to(node.global_position)
 		if abs(_pulse_radius - ndist) <= PULSE_HIT_TOLERANCE:
-			print("파동 히트 노드: ", node.name, " / node_type: ", node.get("node_type"), " / is_placed: ", node.get("is_placed"), " / is_dragging: ", node.get("is_dragging"))
 			_hit_lights.append(node)
 			if node.has_method("trigger_pulse_bonus"):
 				node.trigger_pulse_bonus()

@@ -79,11 +79,6 @@ func _ready() -> void:
 	if node_type == "흡혈":
 		attack_cooldown = 2.0
 
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
-		print("노드 소멸: ", node_type, " / is_placed: ", is_placed, " / 위치: ", global_position)
-		print(get_stack())
-
 func _generate_base_points() -> void:
 	_base_points.clear()
 	var num: int = 32
@@ -480,31 +475,36 @@ func _spawn_burst_effect() -> void:
 func _get_node_info() -> Dictionary:
 	match node_type:
 		"흡혈":
+			var diff: int = ResourceManager.difficulty if ResourceManager else 0
+			var dmg: int = int(base_damage + diff * 10.0)
+			var cd: float = _get_effective_cooldown() if has_method("_get_effective_cooldown") else attack_cooldown
 			return {
 				name = "흡혈",
 				desc = "가장 가까운 혈체 공격",
 				synergy1 = "결계 연결: 데미지 2배",
 				synergy2 = "증폭 연결: 쿨다운 50%↓",
-				atk = 30,
-				cooldown = 2.0
+				atk = dmg,
+				cooldown = cd
 			}
 		"결계":
+			var cd_barrier: float = _get_effective_cooldown() if has_method("_get_effective_cooldown") else attack_cooldown
 			return {
 				name = "결계",
 				desc = "혈체 이동 감속",
 				synergy1 = "흡혈 연결: 데미지 2배",
 				synergy2 = "증폭 연결: 감속 범위 2배",
 				atk = 0,
-				cooldown = 3.0
+				cooldown = cd_barrier
 			}
 		"증폭":
+			var cd_resonate: float = _get_effective_cooldown() if has_method("_get_effective_cooldown") else attack_cooldown
 			return {
 				name = "증폭",
 				desc = "인접 노드 강화",
 				synergy1 = "흡혈 연결: 쿨다운 50%↓",
 				synergy2 = "결계 연결: 감속 범위 2배",
 				atk = 0,
-				cooldown = 3.0
+				cooldown = cd_resonate
 			}
 	return {name = "", desc = "", synergy1 = "", synergy2 = "", atk = 0, cooldown = 0.0}
 
@@ -514,23 +514,17 @@ func _try_place_on_grid() -> void:
 		_range_indicator = null
 	modulate = Color(1, 1, 1, 1)
 	var mouse_pos: Vector2 = get_viewport().get_mouse_position()
-	print("_try_place_on_grid 호출됨")
-	print("mouse_pos: ", mouse_pos)
 
 	# 1순위: 인디케이터 슬롯 위인지 먼저 확인
 	var main = get_tree().get_first_node_in_group("main")
 	if main:
 		var slot_idx: int = main._get_slot_at(mouse_pos)
-		print("slot_idx: ", slot_idx)
 		if slot_idx >= 0:
-			print("슬롯에 등록됨")
 			main._register_to_slot(slot_idx, self)
 			return  # 그리드 배치 안함
 
 	# 2순위: 마우스가 인디케이터 영역(y > 880)이면 그리드 배치 안함
-	print("mouse_pos.y: ", mouse_pos.y)
 	if mouse_pos.y > 880:
-		print("y > 880 → 슬롯 복귀")
 		_return_to_slot()
 		return
 
@@ -540,15 +534,6 @@ func _try_place_on_grid() -> void:
 		_return_to_slot()
 		return
 	var cell: Vector2i = grid.world_to_grid(global_position)
-	var valid: bool = grid.is_valid_cell(cell.x, cell.y)
-	# 4순위 그리드 배치 직전
-	print("배치 시도 노드: ", node_type, " / 현재 셀: (", grid_col, ",", grid_row, ")")
-	print("목표 셀: ", cell)
-	print("is_placed: ", is_placed)
-	print("셀 좌표: ", cell)
-	print("is_valid_cell: ", valid)
-	print("is_cell_empty: ", grid.is_cell_empty(cell.x, cell.y) if valid else "범위 밖")
-	print("grid[row][col]: ", grid.grid[cell.y][cell.x] if valid else "범위 밖")
 	if grid.is_valid_cell(cell.x, cell.y) and grid.is_cell_empty(cell.x, cell.y):
 		if is_placed and grid_col >= 0 and grid_row >= 0:
 			grid.remove_node(grid_col, grid_row)

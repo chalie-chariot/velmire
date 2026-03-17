@@ -14,6 +14,7 @@ var _hp_bar_alpha: float = 0.0
 var _hp_bar_timer: float = 0.0
 var _hp_bar_duration: float = 2.0
 var _damage_bar_ratio: float = 1.0
+var _bonus_kill: bool = false
 
 func _ready() -> void:
 	_rotation_speed = randf_range(-0.3, 0.3)
@@ -111,15 +112,50 @@ func take_damage(amount: float, source: Node = null) -> void:
 			main.on_entity_killed()
 			if source and source.get_meta("coffin_synergy", "") == "heal" and main.has_method("heal_coffin"):
 				main.heal_coffin(2)
+		_add_blood_on_kill()
 		_spawn_death_effect()
 		_drop_blood()
 		remove_from_group("blood_entities")
 		queue_free()
 
+func _add_blood_on_kill() -> void:
+	var blood_mult: float = 1.0
+	var hp_node = get_tree().get_first_node_in_group("heart_pulse")
+	if hp_node and hp_node.has_method("get_max_blood_mult"):
+		blood_mult = hp_node.get_max_blood_mult()
+	var base_blood: float = max(1.0, max_hp / 60.0) * blood_mult
+
+	# 관 범위 보너스 체크
+	var bonus: int = 0
+	var final_blood: int = int(base_blood)
+	var coffin = get_tree().get_first_node_in_group("coffin")
+	if coffin:
+		var coffin_center: Vector2 = coffin.global_position + coffin.size / 2.0
+		var dist: float = global_position.distance_to(coffin_center)
+		print("처치 위치 관까지 거리: ", dist)
+		if dist <= 250.0:
+			bonus = 3 + int(base_blood * 0.5)
+			final_blood += bonus
+			_bonus_kill = true
+	ResourceManager.add_blood(final_blood)
+	print("최종 혈액: ", ResourceManager.blood)
+	ResourceManager.heal_coffin(base_blood * 2.0)
+
+	if bonus > 0:
+		var main_node = get_tree().get_first_node_in_group("main")
+		print("main_node: ", main_node)
+		print("has_method: ", main_node.has_method("_show_blood_bonus_popup") if main_node else "main없음")
+		if main_node and main_node.has_method("_show_blood_bonus_popup"):
+			main_node._show_blood_bonus_popup(bonus)
+			print("팝업 호출됨")
+
 func _spawn_death_effect() -> void:
 	var effect = Node2D.new()
 	effect.set_script(preload("res://scripts/DeathEffect.gd"))
 	effect.global_position = global_position
+	# 보너스 킬이면 마젠타색 전달
+	if _bonus_kill:
+		effect.set_meta("death_color", Color(1.0, 0.0, 0.8, 1.0))
 	get_parent().add_child(effect)
 
 func _drop_blood() -> void:
@@ -134,7 +170,7 @@ func _drop_blood() -> void:
 	var drop_value: float = max(1.0, max_hp / 60.0)
 	var drop = drop_scene.instantiate()
 	get_parent().add_child(drop)
-	drop.setup(global_position, drop_value, target, false, kill_in_coffin_range)
+	drop.setup(global_position, drop_value, target, false, false, true)  # visual_only: 혈액은 _add_blood_on_kill에서 지급
 
 func _spawn_damage_number(amount: float) -> void:
 	var label: Label = Label.new()

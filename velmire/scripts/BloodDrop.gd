@@ -13,8 +13,9 @@ var _trail: Array = []  # 잔상 위치 기록
 var _is_stage4: bool = false  # 4단계 이상 여부
 var _trail_max: int = 32
 var _kill_in_coffin_range: bool = false
+var _visual_only: bool = false  # 혈액 이미 지급됨(BloodEntityAI 등)
 
-func setup(pos: Vector2, drop_value: float, coffin_center: Vector2, stage4: bool = false, kill_in_coffin_range: bool = false) -> void:
+func setup(pos: Vector2, drop_value: float, coffin_center: Vector2, stage4: bool = false, kill_in_coffin_range: bool = false, visual_only: bool = false) -> void:
 	global_position = pos
 	value = drop_value
 	_target = coffin_center
@@ -28,6 +29,7 @@ func setup(pos: Vector2, drop_value: float, coffin_center: Vector2, stage4: bool
 	_curve_angle = 1.0 if randf() > 0.5 else -1.0
 	_is_stage4 = stage4
 	_kill_in_coffin_range = kill_in_coffin_range
+	_visual_only = visual_only
 
 func _process(delta: float) -> void:
 	_time += delta
@@ -52,6 +54,9 @@ func _process(delta: float) -> void:
 			_size = clamp(dist / 45.0, 1.0, _size)
 
 			if dist < 8.0:
+				if _visual_only:
+					queue_free()
+					return
 				var blood_mult: float = 1.0
 				var hp = get_tree().get_first_node_in_group("heart_pulse")
 				if hp and hp.has_method("get_max_blood_mult"):
@@ -68,7 +73,9 @@ func _process(delta: float) -> void:
 
 				var bonus: int = final_blood - int(base_blood)
 				if bonus > 0:
-					_show_blood_bonus_popup(bonus)
+					var main = get_tree().get_first_node_in_group("main")
+					if main and main.has_method("_show_blood_bonus_popup"):
+						main._show_blood_bonus_popup(bonus)
 
 				queue_free()
 
@@ -90,49 +97,3 @@ func _draw() -> void:
 		Color(0.8, 0.0, 0.0, _alpha))
 	draw_circle(Vector2.ZERO, r * 0.5,
 		Color(1.0, 0.2, 0.2, _alpha * 0.8))
-
-func _show_blood_bonus_popup(amount: int) -> void:
-	var main = get_tree().get_first_node_in_group("main")
-	if not main:
-		return
-	var canvas_layer = main.get_node("CanvasLayer")
-
-	var base_pos = Vector2(960, 895)
-
-	var count = min(amount, 5)
-	for i in range(count):
-		var dot = Label.new()
-		dot.text = "🩸"
-		dot.add_theme_font_size_override("font_size", 14)
-		dot.modulate = Color(1.0, 0.9, 0.1, 0.0)
-		dot.z_index = 100
-		dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		# 혈액 카운터 아래가 아닌 위에서 시작
-		dot.position = base_pos + Vector2(randf_range(-15.0, 15.0), -20)
-		canvas_layer.add_child(dot)
-
-		var dtw = create_tween()
-		dtw.tween_interval(i * 0.06)
-		dtw.set_parallel(true)
-		dtw.tween_property(dot, "modulate:a", 1.0, 0.15).set_ease(Tween.EASE_OUT)
-		dtw.tween_property(dot, "position:y", dot.position.y - 40, 0.5).set_ease(Tween.EASE_OUT)
-		dtw.tween_property(dot, "modulate:a", 0.0, 0.2).set_delay(0.35)
-		var dcb = func(): dot.queue_free()
-		dtw.tween_callback(dcb).set_delay(0.5)
-
-	var bonus_label = Label.new()
-	bonus_label.text = "+ " + str(amount)
-	bonus_label.add_theme_font_size_override("font_size", 18)
-	bonus_label.modulate = Color(1.0, 0.9, 0.1, 0.0)
-	bonus_label.z_index = 100
-	bonus_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bonus_label.position = base_pos + Vector2(30, 0)
-	canvas_layer.add_child(bonus_label)
-
-	var ltw = create_tween()
-	ltw.set_parallel(true)
-	ltw.tween_property(bonus_label, "modulate:a", 1.0, 0.15).set_ease(Tween.EASE_OUT)
-	ltw.tween_property(bonus_label, "position:y", base_pos.y - 40, 0.6).set_ease(Tween.EASE_OUT)
-	ltw.tween_property(bonus_label, "modulate:a", 0.0, 0.25).set_delay(0.4)
-	var lcb = func(): bonus_label.queue_free()
-	ltw.tween_callback(lcb).set_delay(0.6)
