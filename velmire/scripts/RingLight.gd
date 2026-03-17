@@ -11,6 +11,7 @@ const BUFF_COLORS: Array = [
 ]
 const BUFF_ICONS: Array = ["⏱", "⚔", "🔵", "🩸"]
 const BUFF_NAMES: Array = ["쿨다운 감소", "데미지 증가", "범위 확장", "혈액 증가"]
+const BUFF_COOLDOWN: float = 10.0
 
 var range_radius: float = RANGE_RADIUS
 var ring_size: float = 30.0
@@ -19,8 +20,11 @@ var is_placed: bool = false
 var is_dragging: bool = false
 
 var _countdown: Node = null
+var _cooldown_arc: Node = null
 var _time_left: float = LIFETIME
 var _expired: bool = false
+var _buff_cooldown_left: float = 0.0
+var _buff_ready: bool = true
 var shader_index: int = -1
 
 func _ready() -> void:
@@ -64,6 +68,18 @@ func _process(delta: float) -> void:
 	if not is_placed or _expired:
 		return
 
+	if not _buff_ready:
+		_buff_cooldown_left -= delta
+		if _buff_cooldown_left <= 0.0:
+			_buff_ready = true
+			_buff_cooldown_left = 0.0
+			if _cooldown_arc and is_instance_valid(_cooldown_arc):
+				_cooldown_arc.update_ratio(0.0)
+				_cooldown_arc.modulate = Color(1, 1, 1, 0)
+		elif _cooldown_arc and is_instance_valid(_cooldown_arc):
+			var ratio: float = _buff_cooldown_left / BUFF_COOLDOWN
+			_cooldown_arc.update_ratio(ratio)
+
 	_time_left -= delta
 	var ratio: float = clampf(_time_left / LIFETIME, 0.0, 1.0)
 	if _countdown and is_instance_valid(_countdown):
@@ -90,23 +106,6 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _try_place() -> void:
-	var coffin = get_tree().get_first_node_in_group("coffin")
-	if coffin:
-		var coffin_center: Vector2 = coffin.global_position + coffin.size / 2.0
-		var dist: float = global_position.distance_to(coffin_center)
-		print("링라이트 위치: ", global_position)
-		print("관 global_position: ", coffin.global_position)
-		print("관 size: ", coffin.size)
-		print("관 중심: ", coffin_center)
-		print("거리: ", dist)
-		if dist > 700.0:
-			print("배치 거부 — 거리 초과")
-			var main = get_tree().get_first_node_in_group("main")
-			if main:
-				main._show_deny_popup("설치 범위를 벗어났습니다")
-			queue_free()
-			return
-
 	# 배치 성공 조건 통과 후 루비 차감
 	if ResourceManager.ruby < 2:
 		var main = get_tree().get_first_node_in_group("main")
@@ -226,7 +225,24 @@ func _expire() -> void:
 	tw.tween_callback(cb)
 
 
+func _spawn_cooldown_arc() -> void:
+	var scene = load("res://scenes/RingCountdown.tscn") as PackedScene
+	_cooldown_arc = scene.instantiate()
+	_cooldown_arc.set_meta("small", true)
+	_cooldown_arc.set_meta("no_warning", true)
+	_cooldown_arc.global_position = global_position
+	get_parent().add_child(_cooldown_arc)
+	_cooldown_arc.update_ratio(1.0)
+
+
 func on_buff_received(buff_type: int, buffed_nodes: Array) -> void:
+	_buff_ready = false
+	_buff_cooldown_left = BUFF_COOLDOWN
+	if _cooldown_arc == null or not is_instance_valid(_cooldown_arc):
+		_spawn_cooldown_arc()
+	if _cooldown_arc and is_instance_valid(_cooldown_arc):
+		_cooldown_arc.modulate = Color(1, 1, 1, 1)
+		_cooldown_arc.update_ratio(1.0)
 	var col: Color = BUFF_COLORS[buff_type] if buff_type < BUFF_COLORS.size() else Color.WHITE
 	var main = get_tree().get_first_node_in_group("main")
 	var canvas_layer: Node = main.get_node("CanvasLayer") if main else null

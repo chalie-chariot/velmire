@@ -72,10 +72,16 @@ func _check_pulse_hit_ring_lights() -> void:
 			_apply_buff_to_ring_light(light)
 
 func _apply_buff_to_ring_light(light: Node) -> void:
+	if not light.get("_buff_ready"):
+		return
 	var buff_type: int = randi() % 4
 	var nodes = get_tree().get_nodes_in_group("game_nodes")
 	var buffed_nodes: Array = []
 	for node in nodes:
+		if node.get("_is_being_dragged") == true:
+			continue
+		if node.get("is_placed") == false:
+			continue
 		if node.global_position.distance_to(light.global_position) <= 300.0:
 			buffed_nodes.append(node)
 	if buffed_nodes.is_empty():

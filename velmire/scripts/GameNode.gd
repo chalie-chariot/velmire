@@ -265,18 +265,6 @@ func _process(delta: float) -> void:
 			_range_fade_timer = -1.0
 	if is_dragging:
 		global_position = get_global_mouse_position() + _drag_offset
-		if _range_indicator and is_instance_valid(_range_indicator):
-			_range_indicator.position = global_position + Vector2(-_range_indicator.size.x / 2, -_range_indicator.size.y - 12)
-		# 드래그 중 관 범위 체크
-		var coffin = get_tree().get_first_node_in_group("coffin")
-		if coffin:
-			var coffin_center: Vector2 = coffin.global_position + coffin.size / 2
-			var dist: float = global_position.distance_to(coffin_center)
-			var out: bool = dist > COFFIN_PLACE_RANGE
-			if out != _out_of_range:
-				_out_of_range = out
-				_update_range_indicator(out)
-				modulate = Color(1, 1, 1, 0.4 if out else 1.0)
 
 	if is_placed:
 		_attack_timer += delta
@@ -688,6 +676,8 @@ func _boost_adjacent_nodes() -> bool:
 	return boosted_any
 
 func apply_buff(type: String, mult: float, duration: float) -> void:
+	if not is_placed or _is_being_dragged:
+		return
 	if _buff_tweens.has(type) and _buff_tweens[type] is Tween and _buff_tweens[type].is_valid():
 		_buff_tweens[type].kill()
 	match type:
