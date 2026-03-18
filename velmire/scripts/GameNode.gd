@@ -190,12 +190,14 @@ func _input(event: InputEvent) -> void:
 							cm.start_connect(self)
 						else:
 							cm.finish_connect(self)
-					get_viewport().set_input_as_handled()
+					if get_viewport():
+						get_viewport().set_input_as_handled()
 				elif not Input.is_key_pressed(KEY_SHIFT):
 					# 클릭 vs 드래그 구분: 우선 대기
 					_mouse_down_for_click = true
 					_mouse_down_pos = get_global_mouse_position()
-					get_viewport().set_input_as_handled()
+					if get_viewport():
+						get_viewport().set_input_as_handled()
 			else:
 				# 다른 곳 클릭 시에만 선택 전부 해제 (어떤 노드 위가 아닐 때만)
 				var any_node_hovered := false
@@ -231,7 +233,8 @@ func _input(event: InputEvent) -> void:
 				if main and main.has_method("clear_all_node_selection"):
 					main.clear_all_node_selection()
 				_range_fade_timer = -1.0  # 드래그 시 페이드 취소
-				get_viewport().set_input_as_handled()
+				if get_viewport():
+					get_viewport().set_input_as_handled()
 			elif _mouse_down_for_click and is_hover and _is_topmost_hovered() and not is_dragging:
 				# 클릭만 했을 때 → 정보창 호출 + 다중 선택 (최대 3개)
 				var main = get_tree().get_first_node_in_group("main")
@@ -240,7 +243,8 @@ func _input(event: InputEvent) -> void:
 				if main and main.has_method("register_node_select"):
 					main.register_node_select(self)
 				_mouse_down_for_click = false
-				get_viewport().set_input_as_handled()
+				if get_viewport():
+					get_viewport().set_input_as_handled()
 			else:
 				_mouse_down_for_click = false
 
@@ -252,7 +256,8 @@ func _input(event: InputEvent) -> void:
 			if main and main.has_method("clear_all_node_selection"):
 				main.clear_all_node_selection()
 			_start_drag()
-			get_viewport().set_input_as_handled()
+			if get_viewport():
+				get_viewport().set_input_as_handled()
 
 	if event is InputEventKey:
 		if event.keycode == KEY_SHIFT:
@@ -604,11 +609,11 @@ func _return_to_slot() -> void:
 		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUART)
 	# 그리드에 배치돼 있었으면 복귀 시 재점유
 	if is_placed and grid_col >= 0 and grid_row >= 0:
-		tween.tween_callback(func():
+		var on_restore = func():
 			var g = get_tree().get_first_node_in_group("heart_pulse")
 			if g and g.is_valid_cell(grid_col, grid_row) and g.is_cell_empty(grid_col, grid_row):
 				g.place_node(grid_col, grid_row, node_id)
-		)
+		tween.tween_callback(on_restore)
 
 func _do_attack() -> bool:
 	match node_type:
@@ -753,3 +758,4 @@ func _spawn_attack_line(target_pos: Vector2) -> void:
 	line._from = global_position
 	line._to = target_pos
 	line._color = node_color
+	line._node_type = node_type

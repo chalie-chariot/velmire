@@ -494,10 +494,10 @@ func _close_node_info_panel() -> void:
 	_node_info_panel = null
 	var tw = create_tween()
 	tw.tween_property(panel_ref, "modulate:a", 0.0, 0.12)
-	tw.tween_callback(func():
+	var on_close = func():
 		if is_instance_valid(panel_ref):
 			panel_ref.queue_free()
-	)
+	tw.tween_callback(on_close)
 
 func _show_tooltip(data: Dictionary, anchor_pos: Vector2) -> void:
 	_hide_tooltip()
@@ -670,9 +670,8 @@ func _build_hint_dots() -> void:
 		_dots_container.add_child(slot)
 
 	# BloodCounter (HintArea와 무관하게 항상 표시 → CanvasLayer 직속)
-	print("BloodCounter 생성 / 기존 개수: ", $CanvasLayer.get_children().filter(
-		func(c): return c.name == "BloodCounter"
-	).size())
+	var is_blood_counter = func(c): return c.name == "BloodCounter"
+	print("BloodCounter 생성 / 기존 개수: ", $CanvasLayer.get_children().filter(is_blood_counter).size())
 	var existing = $CanvasLayer.get_node_or_null("BloodCounter")
 	if existing:
 		existing.queue_free()
@@ -709,7 +708,8 @@ func _setup_slot_inputs() -> void:
 		if idx >= _unlocked_slots:
 			slot.gui_input.connect(_on_unlock_slot_gui_input)
 		else:
-			slot.gui_input.connect(func(ev): _on_slot_clicked(ev, idx))
+			var on_slot_clicked = func(ev): _on_slot_clicked(ev, idx)
+			slot.gui_input.connect(on_slot_clicked)
 
 func _on_slot_clicked(event: InputEvent, index: int) -> void:
 	if not event is InputEventMouseButton:
@@ -718,7 +718,8 @@ func _on_slot_clicked(event: InputEvent, index: int) -> void:
 		return
 	var node_id = _slot_data[index] if index < _slot_data.size() else ""
 	if node_id == "":
-		get_viewport().set_input_as_handled()
+		if get_viewport():
+			get_viewport().set_input_as_handled()
 		return
 	var total_nodes: int = get_tree().get_nodes_in_group("game_nodes").size()
 	if total_nodes >= _unlocked_slots:
@@ -948,7 +949,8 @@ func _build_owned_nodes() -> void:
 			Color(1.0, 0.5, 0.5, 0.8))
 		cost_label.position = Vector2(12, 28)
 		row.add_child(cost_label)
-		row.gui_input.connect(func(ev): _on_owned_node_input(ev, data))
+		var on_row_input = func(ev): _on_owned_node_input(ev, data)
+		row.gui_input.connect(on_row_input)
 		_owned_container.add_child(row)
 
 	# 링라이트 버튼 (RingLightCard에 배치 — OwnedNodesContainer 바로 위)
@@ -976,11 +978,11 @@ func _build_owned_nodes() -> void:
 	if installed >= 3:
 		ring_btn.disabled = true
 
-	ring_btn.gui_input.connect(func(ev):
+	var on_ring_input = func(ev):
 		if ev is InputEventMouseButton and \
 		   ev.button_index == MOUSE_BUTTON_LEFT and ev.pressed:
 			_spawn_ring_light()
-	)
+	ring_btn.gui_input.connect(on_ring_input)
 	if ring_card:
 		ring_btn.set_anchors_preset(Control.PRESET_FULL_RECT)
 		ring_btn.offset_left = 4
@@ -1007,7 +1009,8 @@ func _build_owned_nodes() -> void:
 		empty_label.add_theme_color_override("font_color", Color(0.4, 0.0, 0.0))
 		empty_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 		empty.add_child(empty_label)
-		empty.gui_input.connect(func(ev): _on_empty_owned_slot_input(ev))
+		var on_empty_input = func(ev): _on_empty_owned_slot_input(ev)
+		empty.gui_input.connect(on_empty_input)
 		_owned_container.add_child(empty)
 
 	$CanvasLayer/LeftPanel/Card4_DeckSlots.hide()
@@ -1108,7 +1111,8 @@ func _on_empty_slot_gui_input(event: InputEvent) -> void:
 func _on_empty_owned_slot_input(event: InputEvent) -> void:
 	# Q패널 빈 슬롯 클릭 시 이벤트만 흡수 (활성화 방지)
 	if event is InputEventMouseButton and event.pressed:
-		get_viewport().set_input_as_handled()
+		if get_viewport():
+			get_viewport().set_input_as_handled()
 
 func _make_slot_input_handler(index: int) -> Callable:
 	return func(event: InputEvent): _on_slot_gui_input(event, index)
@@ -1225,7 +1229,8 @@ func _show_deny_popup(text: String) -> void:
 		_deny_popup_tween.tween_property(old, "position:y", _coffin_base_pos.y - 180, 0.3).set_ease(Tween.EASE_IN)
 		_deny_popup_tween.tween_property(old, "modulate:a", 0.0, 0.15)
 		_deny_popup_tween.tween_callback(old.queue_free)
-		_deny_popup_tween.tween_callback(func(): _deny_popup_tween = null)
+		var on_deny_clear = func(): _deny_popup_tween = null
+		_deny_popup_tween.tween_callback(on_deny_clear)
 		return
 
 	var label: Label = Label.new()
@@ -1244,7 +1249,8 @@ func _show_deny_popup(text: String) -> void:
 	_deny_popup_tween.tween_property(label, "position:y", _coffin_base_pos.y - 180, 0.3).set_ease(Tween.EASE_IN)
 	_deny_popup_tween.tween_property(label, "modulate:a", 0.0, 0.15)
 	_deny_popup_tween.tween_callback(label.queue_free)
-	_deny_popup_tween.tween_callback(func(): _deny_popup_tween = null)
+	var on_deny_clear = func(): _deny_popup_tween = null
+	_deny_popup_tween.tween_callback(on_deny_clear)
 
 func _shake_slot(index: int) -> void:
 	var slot = _dots_container.get_child(index)
@@ -1265,7 +1271,8 @@ func _on_slot_gui_input(event: InputEvent, index: int) -> void:
 
 	# 중복 방지: 이미 이 슬롯으로 처리 중이면 무시
 	if _pending_spawn_index == index:
-		get_viewport().set_input_as_handled()
+		if get_viewport():
+			get_viewport().set_input_as_handled()
 		return
 
 	if index >= _unlocked_slots:
@@ -1300,7 +1307,8 @@ func _on_slot_gui_input(event: InputEvent, index: int) -> void:
 	_pending_spawn_index = index
 	_spawn_node_to_field(data, true)  # spend_on_drop=true
 	call_deferred("_clear_pending_spawn")  # 프레임 끝에 초기화 (중복 이벤트 방지)
-	get_viewport().set_input_as_handled()
+	if get_viewport():
+		get_viewport().set_input_as_handled()
 
 func _clear_pending_spawn() -> void:
 	_pending_spawn_index = -1
@@ -1311,7 +1319,8 @@ func _on_unlock_slot_gui_input(event: InputEvent) -> void:
 	var mb: InputEventMouseButton = event
 	if mb.button_index != MOUSE_BUTTON_LEFT or not mb.pressed:
 		return
-	get_viewport().set_input_as_handled()
+	if get_viewport():
+		get_viewport().set_input_as_handled()
 	_unlock_next_slot()
 
 func _get_slot_unlock_cost() -> int:
@@ -1729,12 +1738,12 @@ func _process(delta: float) -> void:
 				tween.parallel().tween_property(dot, "modulate", Color(1, 1, 1, 0), 0.2)
 
 			var hide_delay: float = dots.size() * 0.05 + 0.25
-			get_tree().create_timer(hide_delay).timeout.connect(func():
+			var on_hint_hide = func():
 				if _hint_hiding:
 					_hint_area.visible = false
 					_hint_hiding = false
 					_hint_hide_tweens.clear()
-			)
+			get_tree().create_timer(hide_delay).timeout.connect(on_hint_hide)
 
 	# BloodCounter는 update_blood_ui()에서 애니메이션으로 갱신 (blood_changed 시그널)
 
@@ -1926,10 +1935,10 @@ func heal_coffin(amount: float) -> void:
 		heal_bar, "offset_right", 1200.0 * new_ratio, 0.35
 	).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUART)
 	heal_tween.tween_property(heal_bar, "modulate", Color(1, 1, 1, 0), 0.25).set_ease(Tween.EASE_IN)
-	heal_tween.tween_callback(func():
+	var on_heal_reset = func():
 		heal_bar.offset_left = 0.0
 		heal_bar.offset_right = 0.0
-	)
+	heal_tween.tween_callback(on_heal_reset)
 
 	var tw = create_tween()
 	tw.tween_property(_coffin_rect, "modulate", Color(1.0, 0.5, 0.5, 1.0), 0.1).set_ease(Tween.EASE_OUT)
@@ -2059,10 +2068,8 @@ void fragment() {
 	$CanvasLayer.add_child(bw_overlay)
 
 	var tween_bw: Tween = create_tween()
-	tween_bw.tween_method(
-		func(v: float): shader_mat.set_shader_parameter("amount", v),
-		0.0, 1.0, 1.5
-	).set_ease(Tween.EASE_OUT)
+	var set_bw_amount = func(v: float): shader_mat.set_shader_parameter("amount", v)
+	tween_bw.tween_method(set_bw_amount, 0.0, 1.0, 1.5).set_ease(Tween.EASE_OUT)
 
 	var coffin_center: Vector2 = _coffin_rect.position + _coffin_rect.size / 2
 
@@ -2181,7 +2188,8 @@ func _input(event: InputEvent) -> void:
 				var pending = cm.get_pending() if cm else null
 				if cm and pending and cm.has_method("try_connect_to_coffin"):
 					cm.try_connect_to_coffin(pending)
-					get_viewport().set_input_as_handled()
+					if get_viewport():
+						get_viewport().set_input_as_handled()
 
 	# 우클릭: 시너지 연결 대기 중이면 취소, 아니면 노드 제거 (_input에서 처리해 GUI보다 먼저)
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
@@ -2193,13 +2201,15 @@ func _input(event: InputEvent) -> void:
 			cm._clear_highlights()
 			cm._pending = null
 			cm.queue_redraw()
-			get_viewport().set_input_as_handled()
+			if get_viewport():
+				get_viewport().set_input_as_handled()
 			return
 		# 연결 대기 중 아닐 때 노드 제거
 		var clicked_node = _get_hovered_game_node()
 		if clicked_node:
 			clicked_node.on_right_click()
-		get_viewport().set_input_as_handled()
+		if get_viewport():
+			get_viewport().set_input_as_handled()
 		return
 
 	if event is InputEventKey and event.pressed:
@@ -2222,7 +2232,7 @@ func _input(event: InputEvent) -> void:
 			ResourceManager.total_kills += _kill_count
 			Engine.time_scale = 1.0
 			get_tree().paused = false
-			get_tree().reload_current_scene()
+			get_tree().change_scene_to_file("res://scenes/BattleReady.tscn")
 
 		if event.keycode == KEY_X and event.pressed:
 			_recall_slots_to_panel()
@@ -2268,7 +2278,7 @@ func _open_upgrade_menu(node: Node2D) -> void:
 	btn.custom_minimum_size = Vector2(160, 60)
 	btn.position = Vector2(10, 10)
 	var node_ref = node
-	btn.pressed.connect(func():
+	var on_upgrade_pressed = func():
 		if ResourceManager.blood < cost:
 			_show_deny_popup("혈액 부족")
 			return
@@ -2277,7 +2287,7 @@ func _open_upgrade_menu(node: Node2D) -> void:
 		_apply_upgrade(node_ref)
 		_play_upgrade_effect(node_ref)
 		popup.queue_free()
-	)
+	btn.pressed.connect(on_upgrade_pressed)
 	popup.add_child(btn)
 
 	# 닫기
@@ -2285,7 +2295,8 @@ func _open_upgrade_menu(node: Node2D) -> void:
 	close.text = "✕"
 	close.custom_minimum_size = Vector2(24, 24)
 	close.position = Vector2(150, 4)
-	close.pressed.connect(func(): popup.queue_free())
+	var on_close_popup = func(): popup.queue_free()
+	close.pressed.connect(on_close_popup)
 	popup.add_child(close)
 
 	$CanvasLayer.add_child(popup)
@@ -2472,11 +2483,11 @@ func _play_upgrade_effect(node: Node2D) -> void:
 
 		var expand_tw: Tween = create_tween()
 		expand_tw.tween_method(expand_cb, 0.0, 1.0, expand_duration).set_trans(Tween.TRANS_LINEAR)
-		expand_tw.tween_callback(func() -> void:
+		var on_expand_done = func() -> void:
 			orbit_angles[captured_i] = captured_final_angle
 			var n: int = expand_done_counter.get_meta("done") + 1
 			expand_done_counter.set_meta("done", n)
-		)
+		expand_tw.tween_callback(on_expand_done)
 
 	# expand 전부 완료까지 대기 후 흡수 페이즈
 	while expand_done_counter.get_meta("done") < count:
@@ -2529,12 +2540,11 @@ func _play_upgrade_effect(node: Node2D) -> void:
 		var delay: float = randf_range(0.0, 0.2)
 		var absorb_tw: Tween = create_tween()
 		absorb_tw.tween_interval(delay)
-		absorb_tw.tween_method(
-			func(t: float) -> void: _absorb_particle(captured_dot, captured_tail, captured_start, center, captured_size, pos_history, t, captured_glow, captured_core, captured_glow_size, captured_core_size),
-			0.0, 1.0, randf_range(0.4, 0.7)
-		).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_IN)
+		var absorb_step = func(t: float) -> void:
+			_absorb_particle(captured_dot, captured_tail, captured_start, center, captured_size, pos_history, t, captured_glow, captured_core, captured_glow_size, captured_core_size)
+		absorb_tw.tween_method(absorb_step, 0.0, 1.0, randf_range(0.4, 0.7)).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_IN)
 
-		absorb_tw.tween_callback(func() -> void:
+		var on_absorb_done = func() -> void:
 			if is_instance_valid(captured_dot):
 				captured_dot.queue_free()
 			if is_instance_valid(captured_tail):
@@ -2558,7 +2568,7 @@ func _play_upgrade_effect(node: Node2D) -> void:
 			if n >= count and not counter.get_meta("restore_done") and is_instance_valid(node):
 				counter.set_meta("restore_done", true)
 				call_deferred("_restore_node_scale_and_wave", node, color, glow_container)
-		)
+		absorb_tw.tween_callback(on_absorb_done)
 
 func _restore_node_scale_and_wave(node: Node2D, color: Color, glow_container: Node2D = null) -> void:
 	if not is_instance_valid(node):
@@ -2567,9 +2577,9 @@ func _restore_node_scale_and_wave(node: Node2D, color: Color, glow_container: No
 		_upgrade_scale_tween.kill()
 	_upgrade_scale_tween = create_tween()
 	_upgrade_scale_tween.tween_property(node, "scale", Vector2(1.0, 1.0), 0.4).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
-	_upgrade_scale_tween.tween_callback(func() -> void:
+	var on_scale_done = func() -> void:
 		_upgrade_scale_tween = null
-	)
+	_upgrade_scale_tween.tween_callback(on_scale_done)
 
 	# 발광 최대 → 서서히 꺼짐 + 잔광(afterglow) 효과
 	if is_instance_valid(glow_container):
@@ -2705,10 +2715,10 @@ func _burst_upgrade(node: Node2D, color: Color) -> void:
 		var ring_ref: Panel = ring
 		burst.tween_property(ring, "scale", Vector2(scale_tgt, scale_tgt), ring_dur).set_delay(ring_delay).set_ease(Tween.EASE_OUT)
 		burst.tween_property(ring, "modulate", Color(1, 1, 1, 0), ring_dur * 0.85).set_delay(ring_delay + 0.03).set_ease(Tween.EASE_IN)
-		get_tree().create_timer(ring_delay + ring_dur).timeout.connect(func() -> void:
+		var on_ring_timeout = func() -> void:
 			if is_instance_valid(ring_ref):
 				ring_ref.queue_free()
-		)
+		get_tree().create_timer(ring_delay + ring_dur).timeout.connect(on_ring_timeout)
 
 	# 스파크 12개 (작고 빠른 점)
 	for i in range(12):
@@ -2731,10 +2741,10 @@ func _burst_upgrade(node: Node2D, color: Color) -> void:
 			0.0, 1.0, sp_dur
 		).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 		burst.tween_property(spark, "modulate", Color(color.r, color.g, color.b, 0), sp_dur).set_ease(Tween.EASE_IN)
-		get_tree().create_timer(sp_dur).timeout.connect(func() -> void:
+		var on_spark_timeout = func() -> void:
 			if is_instance_valid(spark_ref):
 				spark_ref.queue_free()
-		)
+		get_tree().create_timer(sp_dur).timeout.connect(on_spark_timeout)
 
 	# 방사형 입자 20개 (혜성 꼬리)
 	for i in range(20):
@@ -2772,12 +2782,12 @@ func _burst_upgrade(node: Node2D, color: Color) -> void:
 		burst.tween_property(shard, "modulate", Color(color.r, color.g, color.b, 0), dur * 0.75).set_ease(Tween.EASE_IN)
 		burst.tween_property(shard_tail, "modulate", Color(1, 1, 1, 0), dur * 0.75).set_ease(Tween.EASE_IN)
 
-		get_tree().create_timer(dur).timeout.connect(func() -> void:
+		var on_shard_timeout = func() -> void:
 			if is_instance_valid(shard_ref):
 				shard_ref.queue_free()
 			if is_instance_valid(tail_ref):
 				tail_ref.queue_free()
-		)
+		get_tree().create_timer(dur).timeout.connect(on_shard_timeout)
 
 	# 팡! 후 서서히 원상복구
 	burst.chain().tween_property(node, "scale", Vector2(1.0, 1.0), 0.65).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
@@ -2793,7 +2803,8 @@ func _recall_slots_to_panel() -> void:
 			recalled_count += 1
 			var idx = i
 			var delay = idx * 0.08
-			get_tree().create_timer(delay).timeout.connect(func(): _fire_slot_wave(idx))
+			var on_slot_wave = func(): _fire_slot_wave(idx)
+			get_tree().create_timer(delay).timeout.connect(on_slot_wave)
 		_slot_data[i] = ""
 		_update_slot_visual(i)
 
@@ -2863,9 +2874,10 @@ func _fire_slot_wave(index: int) -> void:
 		tw.parallel().tween_property(ring, "modulate:a", 0.0, 0.35)\
 			.set_delay(0.08).set_ease(Tween.EASE_IN)
 
-	get_tree().create_timer(0.65).timeout.connect(
-		func(): if is_instance_valid(effect): effect.queue_free()
-	)
+	var on_effect_free = func():
+		if is_instance_valid(effect):
+			effect.queue_free()
+	get_tree().create_timer(0.65).timeout.connect(on_effect_free)
 
 func _on_left_tab_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:

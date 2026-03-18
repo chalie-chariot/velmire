@@ -95,7 +95,8 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 			queue_free()
-			get_viewport().set_input_as_handled()
+			if get_viewport():
+				get_viewport().set_input_as_handled()
 			return
 		if event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
 			is_dragging = false
@@ -103,7 +104,8 @@ func _input(event: InputEvent) -> void:
 			return
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		queue_free()
-		get_viewport().set_input_as_handled()
+		if get_viewport():
+			get_viewport().set_input_as_handled()
 
 func _try_place() -> void:
 	# 배치 성공 조건 통과 후 루비 차감

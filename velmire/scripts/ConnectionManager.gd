@@ -21,7 +21,8 @@ func _input(event: InputEvent) -> void:
 			_clear_highlights()
 			_pending = null
 			queue_redraw()
-			get_viewport().set_input_as_handled()
+			if get_viewport():
+				get_viewport().set_input_as_handled()
 		return
 
 	if event is InputEventKey:
@@ -127,9 +128,9 @@ func _spawn_connect_effect(from_node: Node2D, to_node: Node2D) -> void:
 
 func disconnect_from(node: Node2D) -> void:
 	# A 노드 우클릭 시 해당 노드의 모든 연결 해제 (노드-노드 + 관-노드)
-	_connections = _connections.filter(func(conn):
+	var keep_conn = func(conn):
 		return conn.from != node and conn.to != node
-	)
+	_connections = _connections.filter(keep_conn)
 	_disconnect_from_coffin(node)
 	node.is_pending_connection = false
 	node._is_first_selected = false
@@ -192,21 +193,7 @@ func _process(delta: float) -> void:
 		_synergy_flash_time += delta
 		if _synergy_flash_time > 0.4:
 			_synergy_flashing = false
-	# 관-노드 연결선 위치 갱신
-	var main = get_tree().get_first_node_in_group("main")
-	var entity_layer = main.get_node_or_null("EntityLayer") if main else null
-	var coffin = get_tree().get_first_node_in_group("coffin")
-	var coffin_center := Vector2.ZERO
-	if coffin:
-		coffin_center = coffin.global_position + Vector2(coffin.size.x / 2.0, coffin.size.y / 2.0)
-	for node in _coffin_connections:
-		if not is_instance_valid(node):
-			continue
-		if node.has_meta("coffin_line"):
-			var line = node.get_meta("coffin_line")
-			if is_instance_valid(line) and entity_layer:
-				line.set_point_position(0, entity_layer.to_local(node.global_position))
-				line.set_point_position(1, entity_layer.to_local(coffin_center))
+	# 관-노드 혈관 곡선은 각 노드의 vein_timer 콜백에서 갱신됨
 	if _synergy_flashing or not _connections.is_empty() or _pending or not _coffin_connections.is_empty():
 		queue_redraw()
 
@@ -333,6 +320,10 @@ func _disconnect_from_coffin(node: Node) -> void:
 
 func _apply_coffin_synergy(node: Node) -> void:
 	var type = node.get("node_type")
+	if type != null and type != "":
+		node.set_meta("type", type)
+	if "node_color" in node:
+		node.set_meta("color", node.node_color)
 	match type:
 		"흡혈":
 			node.set_meta("coffin_synergy", "heal")
@@ -373,26 +364,176 @@ func _remove_coffin_synergy(node: Node) -> void:
 				if hp and hp.has_method("_deactivate_coffin_pulse_boost"):
 					hp._deactivate_coffin_pulse_boost()
 	node.remove_meta("coffin_synergy")
+	if node.has_meta("type"):
+		node.remove_meta("type")
+	if node.has_meta("color"):
+		node.remove_meta("color")
 
 func _draw_coffin_connection_line(node: Node) -> void:
-	var line = Line2D.new()
-	line.width = 2.5
-	line.default_color = Color(1.0, 0.75, 0.2, 0.7)
 	var main = get_tree().get_first_node_in_group("main")
 	if not main:
 		return
 	var entity_layer = main.get_node_or_null("EntityLayer")
 	if not entity_layer:
 		return
-	entity_layer.add_child(line)
-	line.add_point(entity_layer.to_local(node.global_position))
 	var coffin = get_tree().get_first_node_in_group("coffin")
-	if coffin:
-		var coffin_center = coffin.global_position + Vector2(coffin.size.x / 2.0, coffin.size.y / 2.0)
-		line.add_point(entity_layer.to_local(coffin_center))
+	if not coffin:
+		return
+
+	var coffin_center: Vector2 = coffin.global_position + coffin.size * 0.5
+
+	# 연결된 노드의 실제 색상 참조
+	var line_color: Color
+	if node.has_meta("color"):
+		line_color = node.get_meta("color")
+	else:
+		line_color = node.modulate
+
+	# 외곽 혈관 Line2D
+	var line = Line2D.new()
+	line.width = 14.0
+	line.default_color = Color(line_color.r * 0.6, line_color.g * 0.6, line_color.b * 0.6, 0.85)
+	line.joint_mode = Line2D.LINE_JOINT_ROUND
+	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	line.end_cap_mode = Line2D.LINE_CAP_ROUND
+	entity_layer.add_child(line)
 	node.set_meta("coffin_line", line)
 
+	# 내부 라인 (외곽 위에, 노드 타입 색상 더 밝게)
+	var inner_line = Line2D.new()
+	inner_line.width = 5.0
+	var inner_color: Color = line_color.lightened(0.2)
+	inner_color.a = 0.7
+	inner_line.default_color = inner_color
+	inner_line.joint_mode = Line2D.LINE_JOINT_ROUND
+	inner_line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	inner_line.end_cap_mode = Line2D.LINE_CAP_ROUND
+	entity_layer.add_child(inner_line)
+	node.set_meta("coffin_inner_line", inner_line)
+	node.move_to_front()
+
+	# 잔 라인 3개 생성
+	var side_lines: Array = []
+	var s_phase_mults: Array = [randf_range(0.8, 1.4), randf_range(0.8, 1.4), randf_range(0.8, 1.4)]
+	var s_amps: Array = [randf_range(25.0, 50.0), randf_range(25.0, 50.0), randf_range(25.0, 50.0)]
+	for i in range(3):
+		var sline = Line2D.new()
+		sline.width = 3.0
+		var scolor: Color = line_color
+		scolor.a = randf_range(0.2, 0.4)
+		sline.default_color = scolor
+		sline.joint_mode = Line2D.LINE_JOINT_ROUND
+		sline.begin_cap_mode = Line2D.LINE_CAP_ROUND
+		sline.end_cap_mode = Line2D.LINE_CAP_ROUND
+		entity_layer.add_child(sline)
+		side_lines.append(sline)
+		node.set_meta("coffin_side_line_%d" % i, sline)
+
+	# 제어점 흔들림용 오프셋 (배열로 감싸서 클로저 안에서 수정 가능)
+	var offset := [0.0]
+
+	# 매 프레임 곡선 업데이트 타이머 (line에 부착)
+	var timer = Timer.new()
+	timer.wait_time = 0.016  # ~60fps
+	timer.autostart = true
+
+	var cb = func() -> void:
+		if not is_instance_valid(node) or not is_instance_valid(line) or not is_instance_valid(inner_line):
+			timer.queue_free()
+			return
+		offset[0] += 0.05  # 잔 라인 흔들림용
+		var start: Vector2 = entity_layer.to_local(node.global_position)
+		var end: Vector2 = entity_layer.to_local(coffin_center)
+		var mid: Vector2 = (start + end) * 0.5
+		var perp: Vector2 = (end - start).rotated(PI * 0.5).normalized()
+		var wave: float = 40.0  # 고정 진폭
+		var ctrl1: Vector2 = mid + perp * wave
+		var ctrl2: Vector2 = mid - perp * wave * 0.5
+
+		# 3차 베지어 곡선 점 생성 (외곽 + 내부 동일)
+		line.clear_points()
+		inner_line.clear_points()
+		for i in range(30):
+			var t: float = float(i) / 29.0
+			var p: Vector2 = (1 - t) * (1 - t) * (1 - t) * start + 3 * (1 - t) * (1 - t) * t * ctrl1 + 3 * (1 - t) * t * t * ctrl2 + t * t * t * end
+			line.add_point(p)
+			inner_line.add_point(p)
+
+		# 잔 라인 업데이트
+		for si in range(side_lines.size()):
+			var sline = side_lines[si]
+			if not is_instance_valid(sline):
+				continue
+			var s_offset: float = sin(offset[0] * s_phase_mults[si] + si * 2.1) * s_amps[si]
+			sline.clear_points()
+			for i in range(30):
+				var t: float = float(i) / 29.0
+				var p: Vector2 = (1 - t) * (1 - t) * (1 - t) * start + 3 * (1 - t) * (1 - t) * t * ctrl1 + 3 * (1 - t) * t * t * ctrl2 + t * t * t * end
+				p += perp * s_offset * sin(t * PI)
+				sline.add_point(p)
+
+	timer.timeout.connect(cb)
+	line.add_child(timer)
+
+	# 2초마다 펄스 생성
+	var spawn_timer = Timer.new()
+	spawn_timer.wait_time = 2.0
+	spawn_timer.autostart = true
+	line.add_child(spawn_timer)
+	var spawn_cb = func() -> void:
+		if is_instance_valid(line) and is_instance_valid(inner_line):
+			_spawn_vein_pulse(line, inner_line, entity_layer)
+	spawn_timer.timeout.connect(spawn_cb)
+
+func _spawn_vein_pulse(line: Line2D, inner_line: Line2D, entity_layer: Node2D) -> void:
+	var progress := [1.0]  # 관(끝)에서 시작 → 노드(시작)로
+	var pulse_timer = Timer.new()
+	pulse_timer.wait_time = 0.016
+	line.add_child(pulse_timer)
+
+	var cb = func() -> void:
+		if not is_instance_valid(line) or not is_instance_valid(inner_line):
+			pulse_timer.queue_free()
+			return
+		progress[0] -= 0.02
+		if progress[0] < 0.0:
+			pulse_timer.queue_free()
+			var default_curve = Curve.new()
+			default_curve.add_point(Vector2(0.0, 1.0))
+			default_curve.add_point(Vector2(1.0, 1.0))
+			line.width_curve = default_curve
+			line.width = 14.0
+			inner_line.width_curve = default_curve
+			inner_line.width = 5.0
+			return
+
+		var curve = Curve.new()
+		curve.add_point(Vector2(0.0, 0.3))
+		curve.add_point(Vector2(max(progress[0] - 0.1, 0.0), 0.3))
+		curve.add_point(Vector2(progress[0], 1.0))
+		curve.add_point(Vector2(min(progress[0] + 0.1, 1.0), 0.3))
+		curve.add_point(Vector2(1.0, 0.3))
+		line.width_curve = curve
+		line.width = 28.0
+		inner_line.width_curve = curve
+		inner_line.width = line.width * 0.4
+
+	pulse_timer.timeout.connect(cb)
+	pulse_timer.start()
+
 func _remove_coffin_connection_line(node: Node) -> void:
+	for i in range(3):
+		var meta_key := "coffin_side_line_%d" % i
+		if node.has_meta(meta_key):
+			var sline = node.get_meta(meta_key)
+			if is_instance_valid(sline):
+				sline.queue_free()
+			node.remove_meta(meta_key)
+	if node.has_meta("coffin_inner_line"):
+		var inner = node.get_meta("coffin_inner_line")
+		if is_instance_valid(inner):
+			inner.queue_free()
+		node.remove_meta("coffin_inner_line")
 	if node.has_meta("coffin_line"):
 		var line = node.get_meta("coffin_line")
 		if is_instance_valid(line):

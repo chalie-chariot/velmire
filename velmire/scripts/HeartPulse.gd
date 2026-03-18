@@ -54,6 +54,7 @@ func _process(delta: float) -> void:
 		var progress: float = _pulse_radius / _max_pulse_radius
 		_pulse_alpha = pow(1.0 - progress, 1.5)
 		_check_pulse_hit_ring_lights()
+		_check_pulse_reach(_pulse_radius)
 		if _pulse_radius >= _max_pulse_radius:
 			_pulsing = false
 			_pulse_alpha = 0.0
@@ -98,6 +99,25 @@ func _on_interval_changed() -> void:
 	var tw = create_tween()
 	tw.tween_property(coffin, "modulate", col, 0.1)
 	tw.tween_property(coffin, "modulate", Color(1, 1, 1, 1), 0.4)
+
+func _check_pulse_reach(pulse_radius: float) -> void:
+	for node in get_tree().get_nodes_in_group("game_nodes"):
+		if not is_instance_valid(node):
+			continue
+		if not node.has_meta("coffin_synergy") or not node.get_meta("coffin_synergy"):
+			continue
+
+		var dist: float = _coffin_center.distance_to(node.global_position)
+		if abs(dist - pulse_radius) < 10.0 and not node.get_meta("pulse_flashed", false):
+			node.set_meta("pulse_flashed", true)
+			_flash_node(node)
+		elif dist > pulse_radius + 10.0:
+			node.set_meta("pulse_flashed", false)
+
+func _flash_node(node: Node2D) -> void:
+	var tween = node.create_tween()
+	tween.tween_property(node, "modulate", Color(2.5, 2.5, 2.5), 0.05)
+	tween.tween_property(node, "modulate", Color(1.0, 1.0, 1.0), 0.25)
 
 func _check_pulse_hit_ring_lights() -> void:
 	var lights = get_tree().get_nodes_in_group("ring_light")

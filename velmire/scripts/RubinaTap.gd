@@ -479,5 +479,6 @@ func _input(event: InputEvent) -> void:
 			var shape := $Area2D/CollisionShape2D.shape as CircleShape2D
 			if shape and local_pos.length() <= shape.radius:
 				if accumulated > 0 and not _collecting:
-					get_viewport().set_input_as_handled()
+					if get_viewport():
+						get_viewport().set_input_as_handled()
 					_collect_rubies()
