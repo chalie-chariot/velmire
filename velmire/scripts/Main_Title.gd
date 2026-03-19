@@ -84,6 +84,11 @@ func _build_ui() -> void:
 	menu_vbox.add_theme_constant_override("separation", BTN_GAP)
 	add_child(menu_vbox)
 
+	# 스테이지 진입 → StageMain.tscn
+	var btn_stage = _make_menu_button("스테이지 진입", true)
+	btn_stage.pressed.connect(_on_stage_entry_pressed)
+	menu_vbox.add_child(btn_stage)
+
 	# 전투 시작 → BattleReady.tscn
 	var btn_battle = _make_menu_button("전투 시작", true)
 	btn_battle.pressed.connect(_on_battle_start_pressed)
@@ -117,6 +122,9 @@ func _make_menu_button(text: String, enabled: bool) -> Button:
 	style_disabled.set_corner_radius_all(8)
 	btn.add_theme_stylebox_override("disabled", style_disabled)
 	return btn
+
+func _on_stage_entry_pressed() -> void:
+	get_tree().change_scene_to_file("res://scenes/StageMain.tscn")
 
 func _on_battle_start_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/BattleReady.tscn")

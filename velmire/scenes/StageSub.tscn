@@ -1,0 +1,191 @@
+[gd_scene load_steps=4 format=3 uid="uid://stage_sub_001"]
+
+[ext_resource type="Script" path="res://scripts/StageSub.gd" id="1_script"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_cardart"]
+bg_color = Color(0.1, 0.02, 0.02, 1)
+corner_radius_top_left = 20
+corner_radius_top_right = 20
+corner_radius_bottom_right = 20
+corner_radius_bottom_left = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_infopanel"]
+bg_color = Color(0.03, 0, 0, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.5, 0.05, 0.05, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+content_margin_left = 12.0
+content_margin_top = 12.0
+content_margin_right = 12.0
+content_margin_bottom = 12.0
+
+[node name="StageSub" type="Node2D"]
+script = ExtResource("1_script")
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+layer = 1
+
+[node name="Background" type="ColorRect" parent="CanvasLayer"]
+z_index = -10
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.02, 0, 0, 1)
+
+[node name="TopBar" type="ColorRect" parent="CanvasLayer"]
+z_index = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 40.0
+grow_horizontal = 2
+color = Color(0.02, 0, 0, 1)
+
+[node name="RouteLabel" type="Label" parent="CanvasLayer/TopBar"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "혈도 I"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RedLine" type="ColorRect" parent="CanvasLayer"]
+z_index = -2
+position = Vector2(0, 0)
+size = Vector2(1920, 4)
+color = Color(0.6, 0.05, 0.05, 0.5)
+
+[node name="CenterGlow" type="ColorRect" parent="CanvasLayer"]
+z_index = -1
+position = Vector2(900, 0)
+size = Vector2(120, 1080)
+color = Color(0.4, 0.0, 0.0, 0.15)
+
+[node name="Card0" type="PanelContainer" parent="CanvasLayer"]
+custom_minimum_size = Vector2(280, 420)
+layout_mode = 0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/Card0"]
+layout_mode = 2
+
+[node name="CardArtArea" type="PanelContainer" parent="CanvasLayer/Card0/VBoxContainer"]
+custom_minimum_size = Vector2(260, 380)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_cardart")
+
+[node name="Card1" type="PanelContainer" parent="CanvasLayer"]
+custom_minimum_size = Vector2(280, 420)
+layout_mode = 0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/Card1"]
+layout_mode = 2
+
+[node name="CardArtArea" type="PanelContainer" parent="CanvasLayer/Card1/VBoxContainer"]
+custom_minimum_size = Vector2(260, 380)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_cardart")
+
+[node name="Card2" type="PanelContainer" parent="CanvasLayer"]
+custom_minimum_size = Vector2(280, 420)
+layout_mode = 0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/Card2"]
+layout_mode = 2
+
+[node name="CardArtArea" type="PanelContainer" parent="CanvasLayer/Card2/VBoxContainer"]
+custom_minimum_size = Vector2(260, 380)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_cardart")
+
+[node name="Card3" type="PanelContainer" parent="CanvasLayer"]
+custom_minimum_size = Vector2(280, 420)
+layout_mode = 0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/Card3"]
+layout_mode = 2
+
+[node name="CardArtArea" type="PanelContainer" parent="CanvasLayer/Card3/VBoxContainer"]
+custom_minimum_size = Vector2(260, 380)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_cardart")
+
+[node name="Card4" type="PanelContainer" parent="CanvasLayer"]
+custom_minimum_size = Vector2(280, 420)
+layout_mode = 0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/Card4"]
+layout_mode = 2
+
+[node name="CardArtArea" type="PanelContainer" parent="CanvasLayer/Card4/VBoxContainer"]
+custom_minimum_size = Vector2(260, 380)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_cardart")
+
+[node name="InfoPanel" type="PanelContainer" parent="CanvasLayer"]
+layout_mode = 1
+anchors_preset = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 1050.0
+offset_top = 480.0
+offset_right = 1900.0
+offset_bottom = 840.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_infopanel")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/InfoPanel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="StageNameLabel" type="Label" parent="CanvasLayer/InfoPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "STAGE - [name]"
+
+[node name="DifficultyLabel" type="Label" parent="CanvasLayer/InfoPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "위험 난이도"
+
+[node name="DifficultyDotsContainer" type="HBoxContainer" parent="CanvasLayer/InfoPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="EnemyPreviewLabel" type="Label" parent="CanvasLayer/InfoPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "적 미리보기"
+
+[node name="RewardLabel" type="Label" parent="CanvasLayer/InfoPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "루비 보상"
+
+[node name="ConfirmButton" type="Button" parent="CanvasLayer/InfoPanel/VBoxContainer"]
+layout_mode = 2
+text = "진입"
+
+[node name="BackButton" type="Button" parent="CanvasLayer"]
+layout_mode = 1
+anchors_preset = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 20.0
+offset_top = 740.0
+offset_right = 200.0
+offset_bottom = 790.0
+text = "← 돌아가기"

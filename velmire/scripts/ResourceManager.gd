@@ -18,6 +18,11 @@ var best_viewers: int = 0
 var ruby: int = 0
 var chip: int = 0    # 블러디아 칩
 
+# 스테이지 선택 (씬 간 전달)
+var selected_route: int = 0   # 스테이지_메인에서 선택한 루트 인덱스
+var selected_stage: int = 0   # 스테이지_서브에서 선택한 카드 인덱스
+var selected_stage_set: int = 0  # 서브씬에서 사용할 카드 세트 인덱스
+
 
 func add_ruby(amount: int) -> void:
 	ruby += amount
@@ -42,7 +47,7 @@ func add_chip(amount: int) -> void:
 
 
 func _ready() -> void:
-	pass
+	add_to_group("resource_manager")
 
 
 ## SynergyEngine에서 시너지 발동 시 호출됨

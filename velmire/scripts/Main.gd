@@ -158,6 +158,8 @@ var _likes: int = 0
 var _viewer_timer: float = 0.0
 var _like_timer: float = 0.0
 var _prev_difficulty: int = 0
+var _stage_difficulty_override: int = -1  # stage_start_stage4 시 4로 고정
+var stage_speed_mult: float = 1.0  # 스테이지 모디파이어
 var _danger_chat_sent: bool = false
 var _kill_count: int = 0
 var _ai_chat_started: bool = false
@@ -175,6 +177,11 @@ const _tooltip_height: float = 180.0
 func _ready() -> void:
 	add_to_group("main")
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	var rm = get_tree().get_first_node_in_group("resource_manager")
+	if rm:
+		stage_speed_mult = rm.get_meta("stage_speed_mult") if rm.has_meta("stage_speed_mult") else 1.0
+		if rm.has_meta("stage_start_stage4"):
+			_stage_difficulty_override = 4
 	var hit_area: Area2D = _coffin.get_node_or_null("HitArea")
 	if hit_area:
 		hit_area.body_entered.connect(_on_coffin_body_entered)
@@ -1801,6 +1808,8 @@ func _process(delta: float) -> void:
 
 func _spawn_blood_entity() -> void:
 	var difficulty: int = int(_elapsed_time / 30.0)
+	if _stage_difficulty_override >= 0:
+		difficulty = max(difficulty, _stage_difficulty_override)
 	ResourceManager.difficulty = difficulty
 
 	var entity: Node2D
@@ -1829,6 +1838,7 @@ func _spawn_blood_entity() -> void:
 	entity.max_hp = 60.0 + difficulty * 20.0
 	entity.hp = entity.max_hp
 	entity.speed = 45.0 + difficulty * 7.0
+	entity.speed *= stage_speed_mult
 	if entity.get("_damage_bar_ratio") != null:
 		entity._damage_bar_ratio = 1.0
 
