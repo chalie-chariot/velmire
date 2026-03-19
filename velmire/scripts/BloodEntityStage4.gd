@@ -1,4 +1,4 @@
-extends Node2D
+extends CharacterBody2D
 
 var radius: float = 40.0
 var hp: float = 100.0
@@ -21,6 +21,8 @@ var _is_slowed: bool = false
 var _hp_bar_alpha: float = 0.0
 var _hp_bar_timer: float = 0.0
 var _damage_bar_ratio: float = 1.0
+var _escape_mode: bool = false  # HP 0 시 Coffin 타겟 중단, 직진 후 화면 밖 사라짐
+var _escape_dir: Vector2 = Vector2.ZERO
 
 func _ready() -> void:
 	add_to_group("blood_entities")
@@ -123,6 +125,22 @@ func _process(delta: float) -> void:
 			_hp_bar_alpha = _hp_bar_timer / 0.5
 	else:
 		_hp_bar_alpha = 0.0
+
+	# HP 0 시: 타겟 중단, 직진, 화면 밖에서 제거
+	var main = get_tree().get_first_node_in_group("main")
+	if main and main.get_coffin_hp_ratio() <= 0.0:
+		if not _escape_mode:
+			_escape_mode = true
+			_escape_dir = (target - global_position).normalized()
+			if _escape_dir.is_zero_approx():
+				_escape_dir = Vector2(1, 0)
+			collision_layer = 0  # 피격 판정 비활성화
+		global_position += _escape_dir * speed * delta
+		if _is_off_screen():
+			remove_from_group("blood_entities")
+			queue_free()
+		queue_redraw()
+		return
 
 	var dir: Vector2 = (target - global_position).normalized()
 	global_position += dir * speed * delta
@@ -306,6 +324,11 @@ func _spawn_damage_number(amount: float) -> void:
 	tween.parallel().tween_property(label, "modulate", Color(1, 1, 1, 0), 0.8)
 	tween.tween_callback(label.queue_free)
 
+func _is_off_screen() -> bool:
+	var margin: float = 80.0
+	return global_position.x < -margin or global_position.x > 1920.0 + margin \
+		or global_position.y < -margin or global_position.y > 1080.0 + margin
+
 func is_slowed() -> bool:
 	return _is_slowed
 
@@ -322,7 +345,7 @@ func _drop_blood() -> void:
 	var coffin = get_tree().get_first_node_in_group("coffin")
 	if not coffin:
 		return
-	var target_pos: Vector2 = coffin.global_position + coffin.size / 2
+	var target_pos: Vector2 = coffin.global_position  # Coffin position = 중심
 	var dist: float = global_position.distance_to(target_pos)
 	var kill_in_coffin_range: bool = dist <= 250.0
 

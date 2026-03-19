@@ -1,7 +1,7 @@
 extends Node2D
 
 @onready var blood_entity_scene = preload("res://scenes/BloodEntity.tscn")
-@onready var _coffin_rect: ColorRect = $CanvasLayer/Coffin
+@onready var _coffin: Node2D = $CanvasLayer/Coffin
 @onready var _vignette: ColorRect = $CanvasLayer/VignetteOverlay
 @onready var _live_dot: Label = $CanvasLayer/TopBar/LiveDot
 @onready var _blood_label: Label = $CanvasLayer/TopBar/BloodLabel
@@ -33,7 +33,7 @@ var _right_tween: Tween
 var _hp_tween: Tween
 var _damage_tween: Tween
 var _coffin_push_tween: Tween
-const _coffin_base_pos: Vector2 = Vector2(920.0, 480.0)
+const _coffin_base_pos: Vector2 = Vector2(960.0, 540.0)  # HeartPulse 중심 (화면 중앙)
 var left_open: bool = false
 var _right_open: bool = false
 var spawn_timer: float = 0.0
@@ -175,7 +175,10 @@ const _tooltip_height: float = 180.0
 func _ready() -> void:
 	add_to_group("main")
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	var coffin_center: Vector2 = _coffin_rect.position + _coffin_rect.size / 2
+	var hit_area: Area2D = _coffin.get_node_or_null("HitArea")
+	if hit_area:
+		hit_area.body_entered.connect(_on_coffin_body_entered)
+	var coffin_center: Vector2 = _coffin.global_position  # Coffin position = 중심
 	$EntityLayer/HeartPulse.setup(coffin_center)
 	var coffin_particles: Node2D = Node2D.new()
 	coffin_particles.set_script(preload("res://scripts/CoffinParticles.gd"))
@@ -339,7 +342,7 @@ func show_tooltip(info: Dictionary, node_color: Color, node: Node2D = null) -> v
 	var bar_top: float = bar_bottom - _tooltip_height
 	var bar_width: float = _tooltip_width
 
-	var coffin_center_x: float = _coffin_rect.global_position.x + _coffin_rect.size.x / 2.0
+	var coffin_center_x: float = _coffin.global_position.x  # Coffin position = 중심
 	var is_left: bool = true
 	if node:
 		is_left = node.global_position.x < coffin_center_x
@@ -603,6 +606,20 @@ func _on_rubina_tap_card_mouse_entered() -> void:
 func _on_resource_tooltip_exited() -> void:
 	_hide_tooltip()
 
+func _is_point_in_coffin(point: Vector2) -> bool:
+	var space = get_world_2d().direct_space_state
+	var query = PhysicsPointQueryParameters2D.new()
+	query.position = point
+	query.collision_mask = 1
+	var results = space.intersect_point(query)
+	for r in results:
+		var col = r.collider
+		if col is Area2D and col.name == "HitArea":
+			var parent = col.get_parent()
+			if parent and parent.is_in_group("coffin"):
+				return true
+	return false
+
 func get_coffin_hp_ratio() -> float:
 	return float(coffin_hp) / float(coffin_max_hp) if coffin_max_hp > 0 else 1.0
 
@@ -610,7 +627,7 @@ func _spawn_start_nodes() -> void:
 	# 기본 노드: 흡혈 1개, 결계 1개 배치
 	var node_scene = preload("res://scenes/GameNode.tscn")
 	var grid = $EntityLayer/HeartPulse
-	var coffin_center: Vector2 = _coffin_rect.position + _coffin_rect.size / 2
+	var coffin_center: Vector2 = _coffin.global_position  # Coffin position = 중심
 
 	var start_nodes = [
 		{"id": "absorb", "type": "흡혈", "color": Color(0.9, 0.1, 0.1)},
@@ -782,7 +799,7 @@ func _is_valid_node_placement(pos: Vector2) -> bool:
 	# 1. 관 중심 기준 범위 체크
 	var coffin = get_tree().get_first_node_in_group("coffin")
 	if coffin:
-		var coffin_center: Vector2 = coffin.global_position + coffin.size / 2.0
+		var coffin_center: Vector2 = coffin.global_position  # Coffin position = 중심
 		var dist: float = pos.distance_to(coffin_center)
 		if dist <= PLACEMENT_VALID_RANGE:
 			return true
@@ -1653,7 +1670,6 @@ func _process(delta: float) -> void:
 		if get_tree().get_nodes_in_group("blood_entities").size() < max_entities:
 			_spawn_blood_entity()
 
-	_check_coffin_collision()
 	_update_coffin_visual()
 
 	if _hp_visible:
@@ -1797,7 +1813,7 @@ func _spawn_blood_entity() -> void:
 		entity = blood_entity_scene.instantiate()
 
 	entity.add_to_group("blood_entities")
-	var coffin_center: Vector2 = _coffin_rect.position + _coffin_rect.size / 2
+	var coffin_center: Vector2 = _coffin.global_position  # Coffin position = 중심
 
 	var side: int = randi() % 4
 	var pos: Vector2
@@ -1825,51 +1841,34 @@ func _spawn_blood_entity() -> void:
 
 func _update_coffin_visual() -> void:
 	var ratio: float = coffin_hp / coffin_max_hp
+	if _coffin.has_method("update_crack_visibility"):
+		_coffin.update_crack_visibility(ratio)
 
-	if ratio > 0.7:
-		_coffin_rect.color = Color(1.0, 1.0, 1.0, 1.0)
-	elif ratio > 0.4:
-		_coffin_rect.color = Color(1.0, 0.7, 0.7, 1.0)
-	elif ratio > 0.1:
-		# 위급 - 빨강 + 점멸
-		var pulse: float = (sin(_elapsed_time * 12.0) + 1.0) * 0.5
-		var bright: float = lerp(0.4, 1.0, pulse)
-		_coffin_rect.color = Color(1.0, 0.3 * bright, 0.3 * bright, 1.0)
-	else:
-		# 사망 직전 - 강한 빨강 + 빠른 점멸
-		var pulse2: float = (sin(_elapsed_time * 20.0) + 1.0) * 0.5
-		var bright2: float = lerp(0.3, 1.0, pulse2)
-		_coffin_rect.color = Color(1.0, 0.1 * bright2, 0.1 * bright2, 1.0)
-
-func _check_coffin_collision() -> void:
-	var coffin_rect: Rect2 = Rect2(_coffin_rect.position, _coffin_rect.size)
-	for entity in get_tree().get_nodes_in_group("blood_entities"):
-		var r: float = entity.radius if "radius" in entity else 30.0
-		var expanded: Rect2 = Rect2(
-			coffin_rect.position - Vector2(r, r),
-			coffin_rect.size + Vector2(r * 2, r * 2)
-		)
-		if expanded.has_point(entity.global_position):
-			var hit_pos: Vector2 = entity.global_position
-			entity.remove_from_group("blood_entities")
-			entity.queue_free()
-			coffin_hp -= 10.0
-			coffin_hp = max(coffin_hp, 0.0)
-			reset_combo()
-			trigger_hitstop(0.1)  # 관 타격 시 더 강한 히트스탑
-			var cm = _get_chat_manager()
-			if cm:
-				cm.send_chat("hit")
-			_viewers += randi_range(1, 8)
-			_likes += randi_range(0, 3)
-			_update_viewer_ui()
-			_trigger_shake()
-			_trigger_vignette()
-			_trigger_shockwave(hit_pos)
-			_trigger_coffin_push(hit_pos)
-			_show_hp_bar()
-			if coffin_hp <= 0.0:
-				_game_over()
+func _on_coffin_body_entered(body: Node2D) -> void:
+	if coffin_hp <= 0.0 or _is_game_over:
+		return  # HP 0 이후 혈체 타격 무시
+	if not body.is_in_group("blood_entities"):
+		return
+	var hit_pos: Vector2 = body.global_position
+	body.remove_from_group("blood_entities")
+	body.queue_free()
+	coffin_hp -= 10.0
+	coffin_hp = max(coffin_hp, 0.0)
+	reset_combo()
+	trigger_hitstop(0.1)
+	var cm = _get_chat_manager()
+	if cm:
+		cm.send_chat("hit")
+	_viewers += randi_range(1, 8)
+	_likes += randi_range(0, 3)
+	_update_viewer_ui()
+	_trigger_shake()
+	_trigger_vignette()
+	_trigger_shockwave(hit_pos)
+	_trigger_coffin_push(hit_pos)
+	_show_hp_bar()
+	if coffin_hp <= 0.0:
+		_game_over()
 
 func _show_hp_bar(from_damage: bool = true) -> void:
 	var hp_fill = $CanvasLayer/CoffinHPBar/HPFill
@@ -1941,8 +1940,8 @@ func heal_coffin(amount: float) -> void:
 	heal_tween.tween_callback(on_heal_reset)
 
 	var tw = create_tween()
-	tw.tween_property(_coffin_rect, "modulate", Color(1.0, 0.5, 0.5, 1.0), 0.1).set_ease(Tween.EASE_OUT)
-	tw.tween_property(_coffin_rect, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.2).set_ease(Tween.EASE_IN)
+	tw.tween_property(_coffin, "modulate", Color(1.0, 0.5, 0.5, 1.0), 0.1).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_coffin, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.2).set_ease(Tween.EASE_IN)
 
 func _activate_coffin_barrier() -> void:
 	_coffin_barrier_active = true
@@ -1951,7 +1950,7 @@ func _deactivate_coffin_barrier() -> void:
 	_coffin_barrier_active = false
 
 func _check_coffin_barrier() -> void:
-	var coffin_center = _coffin_rect.global_position + _coffin_rect.size / 2.0
+	var coffin_center: Vector2 = _coffin.global_position  # Coffin position = 중심
 	var entities = get_tree().get_nodes_in_group("blood_entities")
 	for entity in entities:
 		var dist = entity.global_position.distance_to(coffin_center)
@@ -1960,7 +1959,7 @@ func _check_coffin_barrier() -> void:
 				entity.apply_slow(0.5, 1.0)
 
 func _trigger_coffin_push(hit_pos: Vector2) -> void:
-	var coffin_center: Vector2 = _coffin_rect.global_position + _coffin_rect.size / 2
+	var coffin_center: Vector2 = _coffin.global_position  # Coffin position = 중심
 	var push_dir: Vector2 = (coffin_center - hit_pos).normalized()
 	if push_dir.is_zero_approx():
 		push_dir = Vector2.RIGHT
@@ -1970,8 +1969,8 @@ func _trigger_coffin_push(hit_pos: Vector2) -> void:
 	if _coffin_push_tween:
 		_coffin_push_tween.kill()
 	_coffin_push_tween = create_tween()
-	_coffin_push_tween.tween_property(_coffin_rect, "position", pushed_pos, 0.04).set_ease(Tween.EASE_OUT)
-	_coffin_push_tween.tween_property(_coffin_rect, "position", _coffin_base_pos, 0.18).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	_coffin_push_tween.tween_property(_coffin, "position", pushed_pos, 0.04).set_ease(Tween.EASE_OUT)
+	_coffin_push_tween.tween_property(_coffin, "position", _coffin_base_pos, 0.18).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 
 func _trigger_shake() -> void:
 	var hp_ratio: float = coffin_hp / coffin_max_hp
@@ -1986,7 +1985,7 @@ func _trigger_vignette() -> void:
 	_vignette_tween.tween_property(_vignette, "modulate", Color(1, 1, 1, 0), 0.4).set_ease(Tween.EASE_IN)
 
 func _trigger_shockwave(hit_pos: Vector2) -> void:
-	var coffin_center: Vector2 = _coffin_rect.position + _coffin_rect.size / 2
+	var coffin_center: Vector2 = _coffin.global_position  # Coffin position = 중심
 
 	for i in range(12):
 		var shard: Node2D = Node2D.new()
@@ -2027,13 +2026,29 @@ func _fade_hp_bar(show: bool) -> void:
 func _game_over() -> void:
 	Engine.time_scale = 1.0
 	_is_game_over = true
+	# Coffin HitArea 비활성화 → 혈체 피격 판정 완전 중단
+	var hit_area: Area2D = _coffin.get_node_or_null("HitArea")
+	if hit_area:
+		hit_area.monitoring = false
+		hit_area.monitorable = false
+	var hp = $EntityLayer/HeartPulse
+	if hp and hp.has_method("stop_rose_glow"):
+		hp.stop_rose_glow()  # 맥박 루프 Tween 즉시 중단
+	if _coffin.has_method("play_game_over_shatter"):
+		_coffin.play_game_over_shatter()
+	_trigger_shake()  # 조각 튕길 때 카메라 흔들림
 	var cm = _get_chat_manager()
 	if cm:
 		cm.send_chat("gameover")
 	_live_dot.modulate.a = 1.0
 	_live_dot.add_theme_color_override("font_color", Color(0.8, 0.0, 0.0, 1.0))
+
+	# 파편 바닥에 유지된 채로 3초 대기
+	await get_tree().create_timer(3.0).timeout
+
 	get_tree().paused = true
 
+	# 기존 게임오버 화면 표시
 	var overlay: ColorRect = ColorRect.new()
 	overlay.color = Color(0.05, 0.0, 0.0, 0.0)
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -2071,7 +2086,7 @@ void fragment() {
 	var set_bw_amount = func(v: float): shader_mat.set_shader_parameter("amount", v)
 	tween_bw.tween_method(set_bw_amount, 0.0, 1.0, 1.5).set_ease(Tween.EASE_OUT)
 
-	var coffin_center: Vector2 = _coffin_rect.position + _coffin_rect.size / 2
+	var coffin_center: Vector2 = _coffin.global_position  # Coffin position = 중심
 
 	var label1: Label = Label.new()
 	label1.text = "...아직은 아니야"
@@ -2179,11 +2194,11 @@ func _input(event: InputEvent) -> void:
 			if not panel_rect.has_point(mouse_pos):
 				_close_node_info_panel()
 
-		# SHIFT + 관 클릭 시 관-노드 시너지 연결
+		# SHIFT + 관 클릭 시 관-노드 시너지 연결 (Area2D 피격 영역 활용)
 		if Input.is_key_pressed(KEY_SHIFT):
-			var coffin = $CanvasLayer/Coffin
-			var coffin_rect = Rect2(coffin.global_position, coffin.size)
-			if coffin_rect.has_point(get_viewport().get_mouse_position()):
+			var mouse_pos: Vector2 = get_viewport().get_mouse_position()
+			var hit: bool = _is_point_in_coffin(mouse_pos)
+			if hit:
 				var cm = get_tree().get_first_node_in_group("connection_manager")
 				var pending = cm.get_pending() if cm else null
 				if cm and pending and cm.has_method("try_connect_to_coffin"):

@@ -15,7 +15,7 @@ func _process(delta: float) -> void:
 	# 관 위치 동기화
 	var coffin = get_tree().get_first_node_in_group("coffin")
 	if coffin:
-		_center = coffin.position + coffin.size / 2
+		_center = coffin.global_position  # Coffin position = 중심
 		position = _center
 
 	_spawn_timer += delta

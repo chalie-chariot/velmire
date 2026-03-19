@@ -1,4 +1,4 @@
-extends Node2D
+extends CharacterBody2D
 
 var speed: float = 90.0
 var hp: float = 100.0
@@ -15,6 +15,8 @@ var _hp_bar_timer: float = 0.0
 var _hp_bar_duration: float = 2.0
 var _damage_bar_ratio: float = 1.0
 var _bonus_kill: bool = false
+var _escape_mode: bool = false  # HP 0 시 Coffin 타겟 중단, 직진 후 화면 밖 사라짐
+var _escape_dir: Vector2 = Vector2.ZERO
 
 func _ready() -> void:
 	_rotation_speed = randf_range(-0.3, 0.3)
@@ -41,6 +43,22 @@ func _get_smooth_points() -> PackedVector2Array:
 	return smooth
 
 func _process(delta: float) -> void:
+	# HP 0 시: 타겟 중단, 직진, 화면 밖에서 제거
+	var main = get_tree().get_first_node_in_group("main")
+	if main and main.get_coffin_hp_ratio() <= 0.0:
+		if not _escape_mode:
+			_escape_mode = true
+			_escape_dir = (target - global_position).normalized()
+			if _escape_dir.is_zero_approx():
+				_escape_dir = Vector2(1, 0)
+			collision_layer = 0  # 피격 판정 비활성화
+		global_position += _escape_dir * speed * delta
+		if _is_off_screen():
+			remove_from_group("blood_entities")
+			queue_free()
+		queue_redraw()
+		return
+
 	rotation += _rotation_speed * delta
 	var dir: Vector2 = (target - global_position).normalized()
 	global_position += dir * speed * delta
@@ -130,7 +148,7 @@ func _add_blood_on_kill() -> void:
 	var final_blood: int = int(base_blood)
 	var coffin = get_tree().get_first_node_in_group("coffin")
 	if coffin:
-		var coffin_center: Vector2 = coffin.global_position + coffin.size / 2.0
+		var coffin_center: Vector2 = coffin.global_position  # Coffin position = 중심
 		var dist: float = global_position.distance_to(coffin_center)
 		print("처치 위치 관까지 거리: ", dist)
 		if dist <= 250.0:
@@ -163,7 +181,7 @@ func _drop_blood() -> void:
 	var coffin = get_tree().get_first_node_in_group("coffin")
 	if not coffin:
 		return
-	var target: Vector2 = coffin.global_position + coffin.size / 2
+	var target: Vector2 = coffin.global_position  # Coffin position = 중심
 	var dist: float = global_position.distance_to(target)
 	var kill_in_coffin_range: bool = dist <= 250.0
 
@@ -189,6 +207,11 @@ func _spawn_damage_number(amount: float) -> void:
 		label.global_position + Vector2(0, -40), 0.8)
 	tween.parallel().tween_property(label, "modulate", Color(1, 1, 1, 0), 0.8)
 	tween.tween_callback(label.queue_free)
+
+func _is_off_screen() -> bool:
+	var margin: float = 80.0
+	return global_position.x < -margin or global_position.x > 1920.0 + margin \
+		or global_position.y < -margin or global_position.y > 1080.0 + margin
 
 func is_slowed() -> bool:
 	return _is_slowed

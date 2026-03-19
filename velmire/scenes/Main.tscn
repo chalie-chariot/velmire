@@ -1,9 +1,9 @@
-[gd_scene load_steps=27 format=3 uid="uid://b1main001"]
+[gd_scene load_steps=28 format=3 uid="uid://b1main001"]
 
 [ext_resource type="Script" path="res://scripts/Main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/HeartPulse.tscn" id="2_heartpulse"]
 [ext_resource type="Script" path="res://scripts/ConnectionManager.gd" id="3_conn"]
-
+[ext_resource type="PackedScene" path="res://scenes/CoffinNode.tscn" id="4_coffin"]
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_topbar"]
 bg_color = Color(0.05098, 0, 0, 0.8)
 border_width_bottom = 2
@@ -203,14 +203,7 @@ theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
 theme_override_font_sizes/font_size = 17
 text = "🩸 0"
 
-[node name="Coffin" type="ColorRect" parent="CanvasLayer" groups=["coffin"]]
-layout_mode = 1
-anchors_preset = 0
-offset_left = 920.0
-offset_top = 480.0
-offset_right = 1000.0
-offset_bottom = 600.0
-color = Color(1, 1, 1, 1)
+[node name="Coffin" parent="CanvasLayer" instance=ExtResource("4_coffin")]
 
 [node name="CoffinHPBar" type="Control" parent="CanvasLayer"]
 layout_mode = 1

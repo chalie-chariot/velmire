@@ -28,9 +28,13 @@ var _coffin_pulse_boost: bool = false
 var _pulse_alpha: float = 0.0
 var _pulsing: bool = false
 var _max_pulse_radius: float = 1200.0
+var _rose_glow_stopped: bool = false  # 게임오버 시 맥박 루프 중단
+
+signal pulse_started
 
 func _ready() -> void:
 	add_to_group("heart_pulse")
+	process_mode = Node.PROCESS_MODE_ALWAYS  # 게임오버 퍼즈 시에도 맥박 확장
 	for r in range(GRID_ROWS):
 		var row: Array = []
 		for c in range(GRID_COLS):
@@ -49,6 +53,9 @@ func _process(delta: float) -> void:
 		_pulse_time = 0.0
 		_start_pulse()
 
+	# 장미 글로우: HeartPulse 박자에 맞춰 modulate 붉게 sine 루프
+	_update_rose_glow()
+
 	if _pulsing:
 		_pulse_radius += 600.0 * delta
 		var progress: float = _pulse_radius / _max_pulse_radius
@@ -66,6 +73,16 @@ func _start_pulse() -> void:
 	_pulse_alpha = 1.0
 	_pulsing = true
 	_hit_lights.clear()
+	pulse_started.emit()
+
+func get_pulse_radius() -> float:
+	return _pulse_radius
+
+func get_pulse_center() -> Vector2:
+	return _coffin_center
+
+func is_pulsing() -> bool:
+	return _pulsing
 
 func _update_pulse_interval() -> void:
 	var main = get_tree().get_first_node_in_group("main")
@@ -90,6 +107,20 @@ func _activate_coffin_pulse_boost() -> void:
 
 func _deactivate_coffin_pulse_boost() -> void:
 	_coffin_pulse_boost = false
+
+func _update_rose_glow() -> void:
+	if _rose_glow_stopped:
+		return
+	var coffin = get_tree().get_first_node_in_group("coffin")
+	if not coffin or not coffin.has_node("CoffinRose"):
+		return
+	var rose: Sprite2D = coffin.get_node("CoffinRose")
+	var phase: float = _pulse_time / _current_interval * TAU
+	var t: float = (sin(phase) + 1.0) * 0.5
+	rose.modulate = Color(2.0, 0.1, 0.1).lerp(Color(0.8, 0.1, 0.1), t)
+
+func stop_rose_glow() -> void:
+	_rose_glow_stopped = true
 
 func _on_interval_changed() -> void:
 	var coffin = get_tree().get_first_node_in_group("coffin")

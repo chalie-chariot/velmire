@@ -1,0 +1,89 @@
+[gd_scene format=3 uid="uid://b41l62blaw5uk"]
+
+[ext_resource type="Script" uid="uid://dulhn4t01rc5d" path="res://scripts/Coffin.gd" id="1_coffin"]
+[ext_resource type="Texture2D" uid="uid://c45mw6r4w22pp" path="res://assets/coffin/coffin_base.png" id="2_base"]
+[ext_resource type="Texture2D" uid="uid://dpgjve837kruf" path="res://assets/coffin/coffin_rose.png" id="3_rose"]
+[ext_resource type="Texture2D" uid="uid://ckoh8rpu806cu" path="res://assets/coffin/coffin_crack_01.png" id="4_c01"]
+[ext_resource type="Texture2D" uid="uid://bk20jfaf68h11" path="res://assets/coffin/coffin_crack_02.png" id="5_c02"]
+[ext_resource type="Texture2D" uid="uid://brh1mepcbipk5" path="res://assets/coffin/coffin_crack_03.png" id="6_c03"]
+[ext_resource type="Texture2D" uid="uid://brpntc6xs07yr" path="res://assets/coffin/coffin_crack_04.png" id="7_c04"]
+[ext_resource type="Texture2D" uid="uid://cw3h5d7c3ccot" path="res://assets/coffin/coffin_crack_05.png" id="8_c05"]
+[ext_resource type="Texture2D" uid="uid://dvbdv2w5wdd8o" path="res://assets/coffin/coffin_crack_06.png" id="9_c06"]
+[ext_resource type="Texture2D" uid="uid://nqn58ma7rl87" path="res://assets/coffin/coffin_crack_21.png" id="10_c21"]
+[ext_resource type="Texture2D" uid="uid://bmd08lxtt0sek" path="res://assets/coffin/coffin_crack_22.png" id="11_c22"]
+[ext_resource type="Texture2D" uid="uid://bmestni4htupv" path="res://assets/coffin/coffin_crack_23.png" id="12_c23"]
+[ext_resource type="Texture2D" uid="uid://ukjpdrjcc6vr" path="res://assets/coffin/coffin_crack_24.png" id="13_c24"]
+[ext_resource type="Texture2D" uid="uid://bo0shfnt63rs0" path="res://assets/coffin/coffin_crack_25.png" id="14_c25"]
+[ext_resource type="Texture2D" uid="uid://j5b1r5g3jx85" path="res://assets/coffin/coffin_crack_26.png" id="15_c26"]
+[ext_resource type="Texture2D" uid="uid://q0g2474dsck0" path="res://assets/coffin/coffin_crack_27.png" id="16_c27"]
+[ext_resource type="Texture2D" uid="uid://cuc1frpj3kmw7" path="res://assets/coffin/coffin_crack_28.png" id="17_c28"]
+[ext_resource type="Texture2D" uid="uid://dxu1mfv1j6nxp" path="res://assets/coffin/coffin_crack_29.png" id="18_c29"]
+
+[node name="Coffin" type="Node2D" unique_id=541698520 groups=["coffin"]]
+position = Vector2(960, 540)
+scale = Vector2(0.144, 0.144)
+script = ExtResource("1_coffin")
+
+[node name="CoffinBase" type="Sprite2D" parent="." unique_id=1067337757]
+texture = ExtResource("2_base")
+
+[node name="CoffinRose" type="Sprite2D" parent="." unique_id=379412100]
+texture = ExtResource("3_rose")
+
+[node name="Crack1" type="Node2D" parent="." unique_id=272559736]
+visible = false
+
+[node name="Crack01" type="Sprite2D" parent="Crack1" unique_id=1017215497]
+texture = ExtResource("4_c01")
+
+[node name="Crack02" type="Sprite2D" parent="Crack1" unique_id=1990243293]
+texture = ExtResource("5_c02")
+
+[node name="Crack03" type="Sprite2D" parent="Crack1" unique_id=893791685]
+texture = ExtResource("6_c03")
+
+[node name="Crack04" type="Sprite2D" parent="Crack1" unique_id=1041914795]
+texture = ExtResource("7_c04")
+
+[node name="Crack05" type="Sprite2D" parent="Crack1" unique_id=1731012193]
+texture = ExtResource("8_c05")
+
+[node name="Crack06" type="Sprite2D" parent="Crack1" unique_id=133062877]
+texture = ExtResource("9_c06")
+
+[node name="Crack2" type="Node2D" parent="." unique_id=144014306]
+visible = false
+
+[node name="Crack21" type="Sprite2D" parent="Crack2" unique_id=627265392]
+texture = ExtResource("10_c21")
+
+[node name="Crack22" type="Sprite2D" parent="Crack2" unique_id=840523984]
+texture = ExtResource("11_c22")
+
+[node name="Crack23" type="Sprite2D" parent="Crack2" unique_id=1516302858]
+texture = ExtResource("12_c23")
+
+[node name="Crack24" type="Sprite2D" parent="Crack2" unique_id=599818367]
+texture = ExtResource("13_c24")
+
+[node name="Crack25" type="Sprite2D" parent="Crack2" unique_id=2068417909]
+texture = ExtResource("14_c25")
+
+[node name="Crack26" type="Sprite2D" parent="Crack2" unique_id=1010859816]
+texture = ExtResource("15_c26")
+
+[node name="Crack27" type="Sprite2D" parent="Crack2" unique_id=1013585560]
+texture = ExtResource("16_c27")
+
+[node name="Crack28" type="Sprite2D" parent="Crack2" unique_id=363102748]
+texture = ExtResource("17_c28")
+
+[node name="Crack29" type="Sprite2D" parent="Crack2" unique_id=529886932]
+texture = ExtResource("18_c29")
+
+[node name="ShardRoot" type="Node2D" parent="." unique_id=1735820229]
+
+[node name="HitArea" type="Area2D" parent="." unique_id=1722763313]
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="HitArea" unique_id=2027304460]
+polygon = PackedVector2Array(8.333496, -633.3335, 166.66699, -641.66675, 408.3335, -158.3335, 191.66699, 616.6665, 16.666992, 608.333, -166.6665, 608.333, -383.333, -158.3335, -133.33301, -641.66675)

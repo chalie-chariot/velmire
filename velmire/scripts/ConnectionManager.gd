@@ -380,7 +380,7 @@ func _draw_coffin_connection_line(node: Node) -> void:
 	if not coffin:
 		return
 
-	var coffin_center: Vector2 = coffin.global_position + coffin.size * 0.5
+	var coffin_center: Vector2 = coffin.global_position  # Coffin position = 중심 (960, 540)
 
 	# 연결된 노드의 실제 색상 참조
 	var line_color: Color
