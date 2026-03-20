@@ -3,27 +3,45 @@
 [ext_resource type="Script" uid="uid://clsswsdlrshky" path="res://scripts/MainTitleManager.gd" id="1_mgr"]
 [ext_resource type="PackedScene" uid="uid://dle555d6nymb2" path="res://assets/room/room.glb" id="2_gfg0w"]
 [ext_resource type="Script" uid="uid://crsk7tf052gi8" path="res://scripts/ToonMaterialHelper.gd" id="3_toon"]
+[ext_resource type="Script" uid="uid://dn5qijnygjw2a" path="res://scripts/MainTitleUI.gd" id="4_ui"]
 
 [sub_resource type="Environment" id="Environment_title"]
 background_mode = 1
-background_color = Color(0.117647, 0.105882, 0.180392, 1)
+background_color = Color(0.031373, 0.023529, 0.031373, 1)
 ambient_light_source = 2
-ambient_light_color = Color(0.05098, 0.039216, 0.101961, 1)
-ambient_light_energy = 0.08
+ambient_light_color = Color(0.062745, 0.031373, 0.062745, 1)
+ambient_light_energy = 0.05
 tonemap_mode = 2
-tonemap_exposure = 1.0
-tonemap_white = 1.0
 glow_enabled = true
-glow_normalized = false
-glow_intensity = 0.8
-glow_bloom = 0.20
-glow_hdr_luminance_cap = 12.0
-glow_blend_mode = 0
 glow_levels/1 = 1.0
 glow_levels/2 = 1.0
 glow_levels/3 = 0.8
 glow_levels/4 = 0.6
 glow_levels/5 = 0.4
+glow_intensity = 1.0
+glow_bloom = 0.25
+glow_blend_mode = 0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_menu_n"]
+bg_color = Color(0.419608, 0, 0.207843, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_menu_h"]
+bg_color = Color(0.545098, 0, 0.270588, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_menu_d"]
+bg_color = Color(0.239216, 0, 0.117647, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
 
 [node name="Main_Title" type="Node3D" unique_id=2144960222]
 script = ExtResource("1_mgr")
@@ -33,15 +51,14 @@ environment = SubResource("Environment_title")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=501083005]
 transform = Transform3D(0.9063078, -0.34618866, 0.2424039, -9.10032e-10, 0.57357645, 0.81915206, -0.4226183, -0.7424039, 0.51983684, -1, 5, 3)
-light_color = Color(1, 1, 1, 1)
-light_energy = 1.0
+light_color = Color(0.101961, 0.070588, 0.094118, 1)
+light_energy = 0.3
 shadow_enabled = true
 shadow_opacity = 0.9
 
 [node name="OmniLight_Ring" type="OmniLight3D" parent="." unique_id=1984254253]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.2, -1.5, 1.8)
-light_color = Color(1, 1, 1, 1)
-light_energy = 4.0
+light_energy = 5.0
 omni_range = 4.0
 
 [node name="OmniLight_Monitor" type="OmniLight3D" parent="." unique_id=2024465006]
@@ -57,5 +74,96 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.1, 2.1, 2.1)
 script = ExtResource("3_toon")
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=1220373577]
-transform = Transform3D(0.13352276, -0.060323015, 0.9892082, 0.020117711, 0.99810517, 0.058150083, -0.99084157, 0.012136245, 0.13448332, 4.53098, 3.551872, 3.7903094)
-fov = 48.795918
+transform = Transform3D(0.13352276, -0.060323015, 0.9892082, 0.020117711, 0.99810517, 0.05815008, -0.99084157, 0.012136245, 0.13448332, 4.53098, 3.551872, 3.7903094)
+fov = 54.5
+
+[node name="UI" type="CanvasLayer" parent="." unique_id=983179643]
+script = ExtResource("4_ui")
+
+[node name="MenuButtons" type="VBoxContainer" parent="UI" unique_id=850551277]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -436.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 454.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_constants/separation = 12
+
+[node name="Btn_Stage" type="Button" parent="UI/MenuButtons" unique_id=896475406]
+custom_minimum_size = Vector2(420, 78)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 0.533333, 0.733333, 1)
+theme_override_colors/font_disabled_color = Color(0.333333, 0.333333, 0.333333, 1)
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxFlat_menu_n")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_menu_n")
+theme_override_styles/hover = SubResource("StyleBoxFlat_menu_h")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_menu_d")
+theme_override_styles/focus = SubResource("StyleBoxFlat_menu_n")
+text = "스테이지 진입"
+
+[node name="Btn_Battle" type="Button" parent="UI/MenuButtons" unique_id=2007447097]
+custom_minimum_size = Vector2(420, 78)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 0.533333, 0.733333, 1)
+theme_override_colors/font_disabled_color = Color(0.333333, 0.333333, 0.333333, 1)
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxFlat_menu_n")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_menu_n")
+theme_override_styles/hover = SubResource("StyleBoxFlat_menu_h")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_menu_d")
+theme_override_styles/focus = SubResource("StyleBoxFlat_menu_n")
+text = "전투 시작"
+
+[node name="Btn_Shop" type="Button" parent="UI/MenuButtons" unique_id=515341320]
+custom_minimum_size = Vector2(420, 78)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 0.533333, 0.733333, 1)
+theme_override_colors/font_disabled_color = Color(0.333333, 0.333333, 0.333333, 1)
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxFlat_menu_n")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_menu_n")
+theme_override_styles/hover = SubResource("StyleBoxFlat_menu_h")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_menu_d")
+theme_override_styles/focus = SubResource("StyleBoxFlat_menu_n")
+disabled = true
+text = "상점
+준비 중"
+
+[node name="Btn_Roulette" type="Button" parent="UI/MenuButtons" unique_id=1756884774]
+custom_minimum_size = Vector2(420, 78)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 0.533333, 0.733333, 1)
+theme_override_colors/font_disabled_color = Color(0.333333, 0.333333, 0.333333, 1)
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxFlat_menu_n")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_menu_n")
+theme_override_styles/hover = SubResource("StyleBoxFlat_menu_h")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_menu_d")
+theme_override_styles/focus = SubResource("StyleBoxFlat_menu_n")
+disabled = true
+text = "룰렛
+준비 중"
+
+[node name="Btn_Settings" type="Button" parent="UI/MenuButtons" unique_id=1903510163]
+custom_minimum_size = Vector2(420, 78)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 0.533333, 0.733333, 1)
+theme_override_colors/font_disabled_color = Color(0.333333, 0.333333, 0.333333, 1)
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxFlat_menu_n")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_menu_n")
+theme_override_styles/hover = SubResource("StyleBoxFlat_menu_h")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_menu_d")
+theme_override_styles/focus = SubResource("StyleBoxFlat_menu_n")
+disabled = true
+text = "설정
+준비 중"
