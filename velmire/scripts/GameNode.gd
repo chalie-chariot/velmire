@@ -55,6 +55,7 @@ var _pulse_bonus_multiplier: float = 2.0
 # 강화
 var upgrade_level: int = 0
 var max_upgrade: int = 3  # 특수 노드는 2로 설정
+var is_upgrading: bool = false  # 파티클 흡수 강화 연출 중 → 드래그/입력 차단
 var base_damage: float = 25.0  # 흡혈용
 var slow_amount: float = 0.5  # 결계용
 var slow_duration: float = 3.0  # 결계용
@@ -78,6 +79,23 @@ func _ready() -> void:
 		add_to_group("game_nodes")
 	if node_type == "흡혈":
 		attack_cooldown = 2.0
+
+
+func begin_upgrade_effect() -> void:
+	is_upgrading = true
+	if is_dragging:
+		is_dragging = false
+		_is_being_dragged = false
+		var grid = get_tree().get_first_node_in_group("heart_pulse")
+		if grid and grid_col >= 0 and grid_row >= 0:
+			if grid.is_valid_cell(grid_col, grid_row) and grid.is_cell_empty(grid_col, grid_row):
+				grid.place_node(grid_col, grid_row, node_id)
+	_mouse_down_for_click = false
+
+
+func end_upgrade_effect() -> void:
+	is_upgrading = false
+
 
 func _generate_base_points() -> void:
 	_base_points.clear()
@@ -160,6 +178,8 @@ func _is_topmost_hovered() -> bool:
 
 func _input(event: InputEvent) -> void:
 	if is_preview:
+		return
+	if is_upgrading:
 		return
 	if event is InputEventMouseButton:
 		var local_pos = to_local(get_global_mouse_position())
@@ -277,7 +297,7 @@ func _process(delta: float) -> void:
 		_range_fade_timer -= delta
 		if _range_fade_timer <= 0:
 			_range_fade_timer = -1.0
-	if is_dragging:
+	if is_dragging and not is_upgrading:
 		global_position = get_global_mouse_position() + _drag_offset
 
 	if is_placed:

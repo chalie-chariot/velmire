@@ -2325,6 +2325,8 @@ func _apply_upgrade(node: Node2D) -> void:
 func _play_upgrade_effect(node: Node2D) -> void:
 	if not is_instance_valid(node) or not node.get("node_color"):
 		return
+	if node.has_method("begin_upgrade_effect"):
+		node.begin_upgrade_effect()
 	var color: Color = node.node_color
 	var center: Vector2 = node.global_position
 	var count: int = 25
@@ -2590,6 +2592,8 @@ func _restore_node_scale_and_wave(node: Node2D, color: Color, glow_container: No
 	_upgrade_scale_tween.tween_property(node, "scale", Vector2(1.0, 1.0), 0.4).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 	var on_scale_done = func() -> void:
 		_upgrade_scale_tween = null
+		if is_instance_valid(node) and node.has_method("end_upgrade_effect"):
+			node.end_upgrade_effect()
 	_upgrade_scale_tween.tween_callback(on_scale_done)
 
 	# 발광 최대 → 서서히 꺼짐 + 잔광(afterglow) 효과
