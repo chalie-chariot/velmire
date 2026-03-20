@@ -35,6 +35,8 @@ func _build_owned_nodes_sample() -> void:
 
 func _clear_ui() -> void:
 	for c in get_children():
+		if c.name == "NodeGridController":
+			continue
 		remove_child(c)
 		c.queue_free()
 
@@ -147,6 +149,8 @@ func _build_ui() -> void:
 		quick_hbox.add_child(qs)
 
 	# 보유 노드 영역 (퀵슬롯 하단 ~ 보유노드 상단 간격 32px)
+	# UI(제목·선·스크롤 프레임)는 기본 위치 유지, 그리드만 안쪽에서 우측으로 밀어 스케일 시 좌측 클리핑 방지
+	const OWNED_NODES_GRID_MARGIN_LEFT := 200
 	const GAP_QUICK_TO_NODES := 32
 	const TOP_SPACER_H := 24
 	const LABEL_H := 34  # font 28 기준
@@ -155,10 +159,12 @@ func _build_ui() -> void:
 	var node_area_y := QUICK_AREA_H + 24 + GAP_QUICK_TO_NODES + TOP_SPACER_H + LABEL_H + LINE_H + SPACER_H
 	const SCROLL_BOTTOM_Y := 880
 	var scroll_h := SCROLL_BOTTOM_Y - node_area_y
+	var owned_nodes_left := RIGHT_PANEL_X + 24
+	var owned_nodes_w := RIGHT_PANEL_W - 48
 
 	var scroll = ScrollContainer.new()
-	scroll.position = Vector2(RIGHT_PANEL_X + 24, node_area_y)
-	scroll.size = Vector2(RIGHT_PANEL_W - 48, scroll_h)
+	scroll.position = Vector2(owned_nodes_left, node_area_y)
+	scroll.size = Vector2(owned_nodes_w, scroll_h)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	add_child(scroll)
@@ -170,8 +176,8 @@ func _build_ui() -> void:
 	list_label.z_index = 10
 
 	var node_header = VBoxContainer.new()
-	node_header.position = Vector2(RIGHT_PANEL_X + 24, QUICK_AREA_H + 24 + GAP_QUICK_TO_NODES)
-	node_header.custom_minimum_size.x = RIGHT_PANEL_W - 48
+	node_header.position = Vector2(owned_nodes_left, QUICK_AREA_H + 24 + GAP_QUICK_TO_NODES)
+	node_header.custom_minimum_size.x = owned_nodes_w
 	node_header.add_theme_constant_override("separation", 0)
 	node_header.add_child(_make_section_top_spacer())
 	node_header.add_child(list_label)
@@ -187,15 +193,28 @@ func _build_ui() -> void:
 	scroll_inner.add_theme_constant_override("separation", 0)
 	scroll.add_child(scroll_inner)
 
+	var grid_wrap = MarginContainer.new()
+	grid_wrap.add_theme_constant_override("margin_left", OWNED_NODES_GRID_MARGIN_LEFT)
+	grid_wrap.add_theme_constant_override("margin_right", 0)
+	grid_wrap.add_theme_constant_override("margin_top", 0)
+	grid_wrap.add_theme_constant_override("margin_bottom", 0)
+	grid_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll_inner.add_child(grid_wrap)
+
 	var grid = GridContainer.new()
+	grid.name = "OwnedNodesGrid"
 	grid.columns = 4
 	grid.add_theme_constant_override("h_separation", 10)
 	grid.add_theme_constant_override("v_separation", 10)
-	scroll_inner.add_child(grid)
+	grid_wrap.add_child(grid)
 
 	for node_data in _owned_nodes:
 		var card = _make_node_card(node_data)
 		grid.add_child(card)
+
+	var ngc = get_node_or_null("NodeGridController")
+	if ngc and ngc.has_method("setup_grid"):
+		ngc.setup_grid(grid)
 
 	var bottom_spacer = Control.new()
 	bottom_spacer.custom_minimum_size = Vector2(0, 24)
@@ -304,30 +323,49 @@ func _make_quick_slot(index: int) -> PanelContainer:
 	# TODO: 드래그앤드롭 연결
 	return panel
 
-func _make_node_card(node_data: Dictionary) -> PanelContainer:
-	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(180, 88)
-	var grade = node_data.get("grade", 0)
-	var border_col = ThemeColors.CARD_BORDER
-	if grade == 1:
-		border_col = ThemeColors.LINE_HOVER
-	elif grade == 2:
-		border_col = ThemeColors.CARD_ACTIVE
-	var style = StyleBoxFlat.new()
-	style.bg_color = ThemeColors.CARD_BG
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(6)
-	style.border_color = border_col
-	style.set_content_margin_all(12)
-	panel.add_theme_stylebox_override("panel", style)
-	var lbl = Label.new()
-	lbl.text = "%s" % node_data.get("type", "?")
-	lbl.add_theme_font_size_override("font_size", 16)
-	lbl.add_theme_color_override("font_color", ThemeColors.TEXT)
-	panel.add_child(lbl)
-	panel.set_meta("node_data", node_data)
+func _make_owned_node_btn_style(stage: String) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.set_corner_radius_all(6)
+	match stage:
+		"normal":
+			s.bg_color = Color(0.101961, 0, 0.062745)  # #1A0010
+			s.border_color = Color(0.266667, 0, 0.133333)  # #440022
+			s.set_border_width_all(1)
+		"hover", "focus":
+			s.bg_color = Color(0.133333, 0, 0.082353)  # #220015
+			s.border_color = Color(1, 0.266667, 0.666667)  # #FF44AA
+			s.set_border_width_all(2)
+		"pressed":
+			s.bg_color = Color(0.164706, 0, 0.094118)  # #2A0018
+			s.border_color = Color(1, 0.533333, 0.8)  # #FF88CC
+			s.set_border_width_all(2)
+		_:
+			s.bg_color = Color(0.101961, 0, 0.062745)
+			s.border_color = Color(0.266667, 0, 0.133333)
+			s.set_border_width_all(1)
+	s.set_content_margin_all(12)
+	return s
+
+
+func _make_node_card(node_data: Dictionary) -> Button:
+	var btn := Button.new()
+	btn.custom_minimum_size = Vector2(180, 92)
+	btn.flat = false
+	btn.focus_mode = Control.FOCUS_ALL
+	btn.text = "%s" % node_data.get("type", "?")
+	btn.add_theme_font_size_override("font_size", 22)
+	var white := Color(1, 1, 1)  # #FFFFFF
+	btn.add_theme_color_override("font_color", white)
+	btn.add_theme_color_override("font_hover_color", white)
+	btn.add_theme_color_override("font_focus_color", white)
+	btn.add_theme_color_override("font_pressed_color", white)
+	btn.add_theme_stylebox_override("normal", _make_owned_node_btn_style("normal"))
+	btn.add_theme_stylebox_override("hover", _make_owned_node_btn_style("hover"))
+	btn.add_theme_stylebox_override("focus", _make_owned_node_btn_style("focus"))
+	btn.add_theme_stylebox_override("pressed", _make_owned_node_btn_style("pressed"))
+	btn.set_meta("node_data", node_data)
 	# TODO: 드래그 시작 연결
-	return panel
+	return btn
 
 func _make_section_line() -> ColorRect:
 	var line = ColorRect.new()

@@ -24,24 +24,24 @@ glow_blend_mode = 0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_menu_n"]
 bg_color = Color(0.419608, 0, 0.207843, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_menu_h"]
 bg_color = Color(0.545098, 0, 0.270588, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_menu_d"]
 bg_color = Color(0.239216, 0, 0.117647, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
 
 [node name="Main_Title" type="Node3D" unique_id=2144960222]
 script = ExtResource("1_mgr")
@@ -84,21 +84,21 @@ script = ExtResource("4_ui")
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -436.0
+offset_left = -352.0
 offset_top = 16.0
 offset_right = -16.0
-offset_bottom = 454.0
+offset_bottom = 366.0
 grow_horizontal = 0
 grow_vertical = 0
-theme_override_constants/separation = 12
+theme_override_constants/separation = 10
 
 [node name="Btn_Stage" type="Button" parent="UI/MenuButtons" unique_id=896475406]
-custom_minimum_size = Vector2(420, 78)
+custom_minimum_size = Vector2(336, 62)
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_hover_color = Color(1, 0.533333, 0.733333, 1)
 theme_override_colors/font_disabled_color = Color(0.333333, 0.333333, 0.333333, 1)
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 19
 theme_override_styles/normal = SubResource("StyleBoxFlat_menu_n")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_menu_n")
 theme_override_styles/hover = SubResource("StyleBoxFlat_menu_h")
@@ -107,12 +107,12 @@ theme_override_styles/focus = SubResource("StyleBoxFlat_menu_n")
 text = "스테이지 진입"
 
 [node name="Btn_Battle" type="Button" parent="UI/MenuButtons" unique_id=2007447097]
-custom_minimum_size = Vector2(420, 78)
+custom_minimum_size = Vector2(336, 62)
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_hover_color = Color(1, 0.533333, 0.733333, 1)
 theme_override_colors/font_disabled_color = Color(0.333333, 0.333333, 0.333333, 1)
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 19
 theme_override_styles/normal = SubResource("StyleBoxFlat_menu_n")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_menu_n")
 theme_override_styles/hover = SubResource("StyleBoxFlat_menu_h")
@@ -121,12 +121,12 @@ theme_override_styles/focus = SubResource("StyleBoxFlat_menu_n")
 text = "전투 시작"
 
 [node name="Btn_Shop" type="Button" parent="UI/MenuButtons" unique_id=515341320]
-custom_minimum_size = Vector2(420, 78)
+custom_minimum_size = Vector2(336, 62)
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_hover_color = Color(1, 0.533333, 0.733333, 1)
 theme_override_colors/font_disabled_color = Color(0.333333, 0.333333, 0.333333, 1)
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 19
 theme_override_styles/normal = SubResource("StyleBoxFlat_menu_n")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_menu_n")
 theme_override_styles/hover = SubResource("StyleBoxFlat_menu_h")
@@ -137,12 +137,12 @@ text = "상점
 준비 중"
 
 [node name="Btn_Roulette" type="Button" parent="UI/MenuButtons" unique_id=1756884774]
-custom_minimum_size = Vector2(420, 78)
+custom_minimum_size = Vector2(336, 62)
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_hover_color = Color(1, 0.533333, 0.733333, 1)
 theme_override_colors/font_disabled_color = Color(0.333333, 0.333333, 0.333333, 1)
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 19
 theme_override_styles/normal = SubResource("StyleBoxFlat_menu_n")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_menu_n")
 theme_override_styles/hover = SubResource("StyleBoxFlat_menu_h")
@@ -153,12 +153,12 @@ text = "룰렛
 준비 중"
 
 [node name="Btn_Settings" type="Button" parent="UI/MenuButtons" unique_id=1903510163]
-custom_minimum_size = Vector2(420, 78)
+custom_minimum_size = Vector2(336, 62)
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_hover_color = Color(1, 0.533333, 0.733333, 1)
 theme_override_colors/font_disabled_color = Color(0.333333, 0.333333, 0.333333, 1)
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 19
 theme_override_styles/normal = SubResource("StyleBoxFlat_menu_n")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_menu_n")
 theme_override_styles/hover = SubResource("StyleBoxFlat_menu_h")

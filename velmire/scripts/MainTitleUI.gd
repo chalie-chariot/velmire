@@ -11,4 +11,4 @@ func _on_stage() -> void:
 	get_tree().change_scene_to_file("res://scenes/StageMain.tscn")
 
 func _on_battle() -> void:
-	get_tree().change_scene_to_file("res://scenes/Main.tscn")
+	get_tree().change_scene_to_file("res://scenes/BattleReady.tscn")

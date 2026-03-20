@@ -179,7 +179,7 @@ func _create_bias_lights() -> void:
 			mesh_inst.mesh = box_mesh
 			mesh_inst.material_override = emit_mat
 			mesh_inst.position = bars[j][0]
-			parent.add_child(mesh_inst)
+			parent.add_child.call_deferred(mesh_inst)
 
 		var omni = OmniLight3D.new()
 		omni.name = "BiasOmni_%d" % i
@@ -187,7 +187,7 @@ func _create_bias_lights() -> void:
 		omni.light_color = bcol
 		omni.light_energy = cfg["energy"] as float
 		omni.omni_range = 1.2
-		parent.add_child(omni)
+		parent.add_child.call_deferred(omni)
 
 	# 책상 아래 LED만 약하게 (다른 조명은 건드리지 않음)
 	var desk_omni = OmniLight3D.new()
@@ -196,7 +196,7 @@ func _create_bias_lights() -> void:
 	desk_omni.light_color = Color(0.0, 1.0, 0.8)
 	desk_omni.light_energy = 0.25
 	desk_omni.omni_range = 0.7
-	parent.add_child(desk_omni)
+	parent.add_child.call_deferred(desk_omni)
 
 	var ceil_omni = OmniLight3D.new()
 	ceil_omni.name = "CeilLED_Omni"
@@ -204,7 +204,7 @@ func _create_bias_lights() -> void:
 	ceil_omni.light_color = Color(0.15, 0.05, 0.08)
 	ceil_omni.light_energy = 0.3
 	ceil_omni.omni_range = 3.0
-	parent.add_child(ceil_omni)
+	parent.add_child.call_deferred(ceil_omni)
 
 
 func _disable_omni_lights_by_prefix(root: Node, prefix: String) -> void:
