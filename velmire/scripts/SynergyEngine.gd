@@ -10,6 +10,8 @@ func _ready() -> void:
 	add_to_group("synergy_engine")
 
 func check_synergies(connection_manager: Node) -> void:
+	# 참고: 관(coffin)-노드 연결(try_connect_to_coffin) 시에는 이 함수가 호출되지 않음.
+	# finish_connect(노드-노드) → _notify_synergy_engine → check_synergies 경로만 사용됨.
 	_clear_all_synergies()
 
 	var connections = connection_manager._connections

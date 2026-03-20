@@ -1,6 +1,7 @@
 extends CharacterBody2D
 
 var speed: float = 90.0
+var base_speed: float = 90.0  # 스폰 시 speed 스냅샷; apply_slow는 항상 이 값 기준
 var hp: float = 100.0
 var max_hp: float = 100.0
 var damage: float = 10.0
@@ -19,6 +20,7 @@ var _escape_mode: bool = false  # HP 0 시 Coffin 타겟 중단, 직진 후 화�
 var _escape_dir: Vector2 = Vector2.ZERO
 
 func _ready() -> void:
+	base_speed = speed
 	_rotation_speed = randf_range(-0.3, 0.3)
 	_generate_points()
 
@@ -150,22 +152,17 @@ func _add_blood_on_kill() -> void:
 	if coffin:
 		var coffin_center: Vector2 = coffin.global_position  # Coffin position = 중심
 		var dist: float = global_position.distance_to(coffin_center)
-		print("처치 위치 관까지 거리: ", dist)
 		if dist <= 250.0:
 			bonus = 3 + int(base_blood * 0.5)
 			final_blood += bonus
 			_bonus_kill = true
 	ResourceManager.add_blood(final_blood)
-	print("최종 혈액: ", ResourceManager.blood)
 	ResourceManager.heal_coffin(base_blood * 2.0)
 
 	if bonus > 0:
 		var main_node = get_tree().get_first_node_in_group("main")
-		print("main_node: ", main_node)
-		print("has_method: ", main_node.has_method("_show_blood_bonus_popup") if main_node else "main없음")
 		if main_node and main_node.has_method("_show_blood_bonus_popup"):
 			main_node._show_blood_bonus_popup(bonus)
-			print("팝업 호출됨")
 
 func _spawn_death_effect() -> void:
 	var effect = Node2D.new()
@@ -218,8 +215,8 @@ func is_slowed() -> bool:
 
 func apply_slow(factor: float, duration: float) -> void:
 	_is_slowed = true
-	speed *= factor
+	speed = base_speed * factor
 	await get_tree().create_timer(duration).timeout
 	if is_inside_tree():
-		speed /= factor
+		speed = base_speed
 	_is_slowed = false

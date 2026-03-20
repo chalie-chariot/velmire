@@ -681,8 +681,6 @@ func _build_hint_dots() -> void:
 		_dots_container.add_child(slot)
 
 	# BloodCounter (HintArea와 무관하게 항상 표시 → CanvasLayer 직속)
-	var is_blood_counter = func(c): return c.name == "BloodCounter"
-	print("BloodCounter 생성 / 기존 개수: ", $CanvasLayer.get_children().filter(is_blood_counter).size())
 	var existing = $CanvasLayer.get_node_or_null("BloodCounter")
 	if existing:
 		existing.queue_free()
@@ -2199,8 +2197,6 @@ func _input(event: InputEvent) -> void:
 			if cm and cm.has_method("_is_point_in_coffin"):
 				hit = cm._is_point_in_coffin(mouse_pos)
 			var pending = cm.get_pending() if cm else null
-			if cm and pending and cm.has_method("log_pending_coffin_click_attempt"):
-				cm.log_pending_coffin_click_attempt(mouse_pos, hit, pending)
 			if hit and cm and pending and cm.has_method("try_connect_to_coffin"):
 				cm.try_connect_to_coffin(pending)
 				if get_viewport():

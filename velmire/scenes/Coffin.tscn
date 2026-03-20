@@ -16,7 +16,6 @@ signal game_over
 var current_hp: float = 100.0
 
 func _ready() -> void:
-	print("Coffin 시작")
 	current_hp = max_hp
 	body_entered.connect(_on_body_entered)
 
