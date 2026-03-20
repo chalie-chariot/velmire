@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://b41l62blaw5uk"]
+[gd_scene load_steps=19 format=3 uid="uid://b41l62blaw5uk"]
 
 [ext_resource type="Script" uid="uid://dulhn4t01rc5d" path="res://scripts/Coffin.gd" id="1_coffin"]
 [ext_resource type="Texture2D" uid="uid://c45mw6r4w22pp" path="res://assets/coffin/coffin_base.png" id="2_base"]
@@ -18,6 +18,9 @@
 [ext_resource type="Texture2D" uid="uid://q0g2474dsck0" path="res://assets/coffin/coffin_crack_27.png" id="16_c27"]
 [ext_resource type="Texture2D" uid="uid://cuc1frpj3kmw7" path="res://assets/coffin/coffin_crack_28.png" id="17_c28"]
 [ext_resource type="Texture2D" uid="uid://dxu1mfv1j6nxp" path="res://assets/coffin/coffin_crack_29.png" id="18_c29"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_coffin_hit"]
+size = Vector2(1920, 1668)
 
 [node name="Coffin" type="Node2D" unique_id=541698520 groups=["coffin"]]
 position = Vector2(960, 540)
@@ -84,6 +87,8 @@ texture = ExtResource("18_c29")
 [node name="ShardRoot" type="Node2D" parent="." unique_id=1735820229]
 
 [node name="HitArea" type="Area2D" parent="." unique_id=1722763313]
+collision_layer = 1
+input_pickable = true
 
-[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="HitArea" unique_id=2027304460]
-polygon = PackedVector2Array(8.333496, -633.3335, 166.66699, -641.66675, 408.3335, -158.3335, 191.66699, 616.6665, 16.666992, 608.333, -166.6665, 608.333, -383.333, -158.3335, -133.33301, -641.66675)
+[node name="CollisionShape2D" type="CollisionShape2D" parent="HitArea" unique_id=2027304460]
+shape = SubResource("RectangleShape2D_coffin_hit")

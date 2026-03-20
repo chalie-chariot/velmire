@@ -177,6 +177,7 @@ const _tooltip_height: float = 180.0
 func _ready() -> void:
 	add_to_group("main")
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_coffin.add_to_group("coffin")  # 교체한 관 노드에도 그룹 보장
 	var rm = get_tree().get_first_node_in_group("resource_manager")
 	if rm:
 		stage_speed_mult = rm.get_meta("stage_speed_mult") if rm.has_meta("stage_speed_mult") else 1.0
@@ -612,20 +613,6 @@ func _on_rubina_tap_card_mouse_entered() -> void:
 
 func _on_resource_tooltip_exited() -> void:
 	_hide_tooltip()
-
-func _is_point_in_coffin(point: Vector2) -> bool:
-	var space = get_world_2d().direct_space_state
-	var query = PhysicsPointQueryParameters2D.new()
-	query.position = point
-	query.collision_mask = 1
-	var results = space.intersect_point(query)
-	for r in results:
-		var col = r.collider
-		if col is Area2D and col.name == "HitArea":
-			var parent = col.get_parent()
-			if parent and parent.is_in_group("coffin"):
-				return true
-	return false
 
 func get_coffin_hp_ratio() -> float:
 	return float(coffin_hp) / float(coffin_max_hp) if coffin_max_hp > 0 else 1.0
@@ -2204,17 +2191,20 @@ func _input(event: InputEvent) -> void:
 			if not panel_rect.has_point(mouse_pos):
 				_close_node_info_panel()
 
-		# SHIFT + 관 클릭 시 관-노드 시너지 연결 (Area2D 피격 영역 활용)
+		# SHIFT + 관 클릭 시 관-노드 시너지 연결 (ConnectionManager Rect 판정)
 		if Input.is_key_pressed(KEY_SHIFT):
-			var mouse_pos: Vector2 = get_viewport().get_mouse_position()
-			var hit: bool = _is_point_in_coffin(mouse_pos)
-			if hit:
-				var cm = get_tree().get_first_node_in_group("connection_manager")
-				var pending = cm.get_pending() if cm else null
-				if cm and pending and cm.has_method("try_connect_to_coffin"):
-					cm.try_connect_to_coffin(pending)
-					if get_viewport():
-						get_viewport().set_input_as_handled()
+			var mouse_pos: Vector2 = get_global_mouse_position()
+			var cm = get_tree().get_first_node_in_group("connection_manager")
+			var hit: bool = false
+			if cm and cm.has_method("_is_point_in_coffin"):
+				hit = cm._is_point_in_coffin(mouse_pos)
+			var pending = cm.get_pending() if cm else null
+			if cm and pending and cm.has_method("log_pending_coffin_click_attempt"):
+				cm.log_pending_coffin_click_attempt(mouse_pos, hit, pending)
+			if hit and cm and pending and cm.has_method("try_connect_to_coffin"):
+				cm.try_connect_to_coffin(pending)
+				if get_viewport():
+					get_viewport().set_input_as_handled()
 
 	# 우클릭: 시너지 연결 대기 중이면 취소, 아니면 노드 제거 (_input에서 처리해 GUI보다 먼저)
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:

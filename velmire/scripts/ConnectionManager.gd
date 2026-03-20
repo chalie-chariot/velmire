@@ -40,12 +40,18 @@ func _input(event: InputEvent) -> void:
 			queue_redraw()
 		elif event.keycode == KEY_SHIFT:
 			if event.pressed:
+				print("[Synergy/CM] 1) SHIFT 키 누름 감지 (ConnectionManager._input)")
+				print("[Synergy/CM]    _pending=", _pending, " _selected=", _selected)
 				if _pending == null and _selected:
 					# 일반 클릭 후 SHIFT 누름 → 범위 표시
+					print("[Synergy/CM]    → 선택 노드로 start_connect 진입 (경로: 클릭선택→SHIFT)")
 					start_connect(_selected)
 					_selected = null
+				elif _pending == null and _selected == null:
+					print("[Synergy/CM]    → start_connect 스킵: _selected 없음 (GameNode SHIFT+클릭 경로 사용)")
 			else:
 				# SHIFT 뗌 → 범위 해제 (누르는 동안에만 유지)
+				print("[Synergy/CM] 1) SHIFT 키 뗌 → 연결 대기 해제")
 				if _pending:
 					_selected = _pending  # 다음 SHIFT에서 바로 범위 표시되도록 복원
 					_pending.is_pending_connection = false
@@ -55,8 +61,16 @@ func _input(event: InputEvent) -> void:
 					queue_redraw()
 
 func start_connect(node: Node2D) -> void:
+	var nm: String = str(node.name) if node else "(null)"
+	var nid: String = str(node.node_id) if node and node.get("node_id") != null else "?"
+	var ntype: String = str(node.node_type) if node and node.get("node_type") != null else "?"
+	var ulv: Variant = node.get("upgrade_level") if node else null
+	print("[Synergy/CM] 1) start_connect 호출 (첫 노드 선택 / SHIFT+클릭 경로)")
+	print("[Synergy/CM] 2) 클릭 대상 노드: name=%s node_id=%s type=%s upgrade_level=%s" % [nm, nid, ntype, ulv])
+
 	# 같은 노드 재클릭 → 취소
 	if _pending == node:
+		print("[Synergy/CM] 4) 연결 조건: 같은 노드 재클릭 → 취소 (통과 안 함)")
 		_pending.is_pending_connection = false
 		_pending._is_first_selected = false
 		_clear_highlights()
@@ -72,14 +86,21 @@ func start_connect(node: Node2D) -> void:
 	node.is_pending_connection = true
 	node._is_first_selected = true
 	_highlight_nearby_nodes(node)
+	print("[Synergy/CM] 4) 연결 조건: 첫 노드 확정 → pending 설정 완료, 주변 하이라이트 적용")
 
 func finish_connect(node: Node2D) -> void:
+	var bnm: String = str(node.name) if node else "(null)"
+	print("[Synergy/CM] 1) finish_connect 호출 (두 번째 노드 SHIFT+클릭)")
+	print("[Synergy/CM] 2) 클릭 대상 노드(두 번째): name=%s type=%s" % [bnm, str(node.node_type) if node and node.get("node_type") != null else "?"])
+
 	# B 노드 선택 (두 번째) → 연결
 	if _pending == null or _pending == node:
+		print("[Synergy/CM] 4) 연결 조건: 실패 — pending 없음 또는 같은 노드 (_pending=%s)" % [_pending])
 		return
 
 	# 동일 타입 노드끼리는 시너지 연결 불가
 	if _pending.node_type == node.node_type:
+		print("[Synergy/CM] 4) 연결 조건: 실패 — 동일 타입 (%s)끼리 연결 불가" % _pending.node_type)
 		_pending.is_pending_connection = false
 		_pending._is_first_selected = false
 		_clear_highlights()
@@ -91,6 +112,7 @@ func finish_connect(node: Node2D) -> void:
 	for conn in _connections:
 		if (conn.from == _pending and conn.to == node) or \
 		   (conn.from == node and conn.to == _pending):
+			print("[Synergy/CM] 4) 연결 조건: 실패 — 이미 연결된 쌍")
 			_pending.is_pending_connection = false
 			_pending._is_first_selected = false
 			_clear_highlights()
@@ -98,6 +120,7 @@ func finish_connect(node: Node2D) -> void:
 			queue_redraw()
 			return
 
+	print("[Synergy/CM] 4) 연결 조건: 통과 — 노드-노드 시너지 연결 확정 (%s ↔ %s)" % [_pending.name, node.name])
 	_connections.append({from = _pending, to = node})
 	var from_node: Node2D = _pending
 	_pending.is_pending_connection = false
@@ -162,12 +185,31 @@ func _highlight_nearby_nodes(source: Node2D) -> void:
 			continue
 		if source.global_position.distance_to(n.global_position) < 400.0:
 			n.is_highlighted = true
+	# Lv.2 이상 노드: 관(coffin)도 시너지 연결 대상에 포함
+	var coffin = source.get_tree().get_first_node_in_group("coffin")
+	print("[Synergy/CM] 3) coffin 그룹 조회: get_first_node_in_group(\"coffin\") = %s (valid=%s)" % [coffin, is_instance_valid(coffin) if coffin else false])
+	if coffin:
+		var in_grp: bool = coffin.is_in_group("coffin")
+		print("[Synergy/CM] 3) coffin 노드 is_in_group(\"coffin\") = %s name=%s" % [in_grp, coffin.name])
+	var ul_ok: bool = source.get("upgrade_level") != null and source.upgrade_level >= 1
+	var dist_c: float = source.global_position.distance_to(coffin.global_position) if coffin else -1.0
+	print("[Synergy/CM] 3) 관 하이라이트 조건: upgrade_level>=1 → %s, 거리<400 → %s (거리=%.1f)" % [ul_ok, coffin != null and dist_c < 400.0, dist_c])
+	if coffin and source.get("upgrade_level") != null and source.upgrade_level >= 1:
+		if source.global_position.distance_to(coffin.global_position) < 400.0:
+			if coffin.has_method("set_connection_target_highlight"):
+				coffin.set_connection_target_highlight(true)
+				print("[Synergy/CM] 3) 관 연결 대상 하이라이트 ON")
+			else:
+				print("[Synergy/CM] 3) 관 하이라이트 스킵: set_connection_target_highlight 없음")
 
 func _clear_highlights() -> void:
 	var nodes = get_tree().get_nodes_in_group("game_nodes")
 	for n in nodes:
 		n.is_highlighted = false
 		n._is_first_selected = false
+	var coffin = get_tree().get_first_node_in_group("coffin")
+	if coffin and coffin.has_method("set_connection_target_highlight"):
+		coffin.set_connection_target_highlight(false)
 
 func get_connections_for(node: Node2D) -> Array:
 	var result: Array = []
@@ -290,25 +332,66 @@ func _draw() -> void:
 		var pc: Color = _pending.node_color
 		draw_line(a, b, Color(pc.r, pc.g, pc.b, 0.4), 2.0)
 
+
+## 관 클릭: 물리쿼리 대신 coffin 중심 + AABB(Rect) 거리/영역 판정 (global 좌표)
+func _is_point_in_coffin(pos: Vector2) -> bool:
+	var coffin = get_tree().get_first_node_in_group("coffin")
+	if not coffin:
+		return false
+	var coffin_global: Vector2 = coffin.global_position
+	var coffin_size: Vector2 = Vector2(80, 120)  # 관 실제 크기로 수정
+	var rect: Rect2 = Rect2(coffin_global - coffin_size / 2.0, coffin_size)
+	return rect.has_point(pos)
+
+
+## Main._input에서만 호출: 시너지 대기(_pending) 중 SHIFT+좌클릭 시 _is_point_in_coffin 결과 로그
+func log_pending_coffin_click_attempt(mouse_pos: Vector2, in_coffin_rect: bool, pending_node: Node2D) -> void:
+	print("[Synergy/CM] --- 관(coffin) 클릭 판정 (_pending 있을 때) ---")
+	print("[Synergy/CM]   mouse_pos(global)=", mouse_pos, " _is_point_in_coffin(Rect)=", in_coffin_rect)
+	print("[Synergy/CM]   CM._pending=", _pending, " Main에서 넘긴 pending=", pending_node)
+	print("[Synergy/CM]   _pending==pending_node: ", _pending == pending_node)
+	if in_coffin_rect and pending_node:
+		print("[Synergy/CM]   → 곧 try_connect_to_coffin 호출 예정")
+	elif not in_coffin_rect:
+		print("[Synergy/CM]   → Rect 밖: coffin 중심·coffin_size(80x120) 조정")
+	elif not pending_node:
+		print("[Synergy/CM]   → pending 없음: try_connect 스킵")
+
+
 func try_connect_to_coffin(node: Node) -> void:
+	print("[Synergy/CM] try_connect_to_coffin 진입 (_is_point_in_coffin Rect 통과 + pending 있음)")
+	print("[Synergy/CM]   try_connect 시점 _pending==node: ", _pending == node)
+	var nnm: String = str(node.name) if node else "(null)"
+	var nul: Variant = node.get("upgrade_level") if node else null
+	print("[Synergy/CM] 2) pending 노드: name=%s upgrade_level=%s" % [nnm, nul])
+
+	var coffin = get_tree().get_first_node_in_group("coffin")
+	print("[Synergy/CM] 3) coffin 그룹 조회: get_first_node_in_group(\"coffin\") = %s" % coffin)
+	if coffin:
+		print("[Synergy/CM] 3) coffin is_in_group(\"coffin\") = %s" % coffin.is_in_group("coffin"))
+
 	# upgrade_level 0 = 기본 / 1 = Lv.2 / 2 = Lv.3
 	# Lv.2 = upgrade_level 1 이상부터 허용
 	if node.get("upgrade_level") == null or node.upgrade_level < 1:
+		print("[Synergy/CM] 4) 연결 조건: 실패 — Lv.2 미만 (upgrade_level=%s)" % nul)
 		var main = get_tree().get_first_node_in_group("main")
 		if main and main.has_method("_show_deny_popup"):
 			main._show_deny_popup("Lv.2 이상 노드만 연결 가능합니다")
 		return
 
 	if node in _coffin_connections:
+		print("[Synergy/CM] 4) 연결 조건: 토글 — 이미 관 연결됨 → 해제")
 		_disconnect_from_coffin(node)
 		return
 
 	if _coffin_connections.size() >= 3:
+		print("[Synergy/CM] 4) 연결 조건: 실패 — 관 연결 최대 3개 (현재 %d)" % _coffin_connections.size())
 		var main = get_tree().get_first_node_in_group("main")
 		if main and main.has_method("_show_deny_popup"):
 			main._show_deny_popup("관 연결은 최대 3개입니다")
 		return
 
+	print("[Synergy/CM] 4) 연결 조건: 통과 — 관-노드 연결 확정")
 	_coffin_connections.append(node)
 	_apply_coffin_synergy(node)
 	_draw_coffin_connection_line(node)

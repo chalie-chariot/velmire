@@ -12,6 +12,7 @@ extends Node2D
 @onready var shard_root: Node2D = $ShardRoot
 var _shatter_played: bool = false
 var _shards_settled: bool = false  # scatter 연출 종료 후 glow 적용
+var _connection_target_highlight: bool = false  # 시너지 연결 대상으로 하이라이트 중
 var _shard_sprites: Array[Sprite2D] = []
 var _shard_glow_state: Dictionary = {}  # Sprite2D -> "dark"|"fade_in"|"glow"|"fade_out"|"passed"
 var _shard_tweens: Dictionary = {}  # Sprite2D -> Tween
@@ -29,8 +30,23 @@ func _ready() -> void:
 		hp.pulse_started.connect(_on_pulse_started)
 	if coffin_base and coffin_base.texture:
 		size = coffin_base.texture.get_size() * scale
+		_sync_hit_shape_to_base_texture()
 	crack1.visible = false
 	crack2.visible = false
+
+
+## HitArea: CoffinBase와 동일 텍스처 크기(중앙 정렬 Sprite2D와 물리 히트 일치)
+func _sync_hit_shape_to_base_texture() -> void:
+	var cs: CollisionShape2D = get_node_or_null("HitArea/CollisionShape2D") as CollisionShape2D
+	if not cs or not (cs.shape is RectangleShape2D):
+		return
+	if not coffin_base or not coffin_base.texture:
+		return
+	(cs.shape as RectangleShape2D).size = coffin_base.texture.get_size()
+
+
+func set_connection_target_highlight(enable: bool) -> void:
+	_connection_target_highlight = enable
 
 
 func update_crack_visibility(hp_ratio: float) -> void:
@@ -49,6 +65,8 @@ func _on_pulse_started() -> void:
 
 
 func _process(_delta: float) -> void:
+	# 시너지 연결 대상 하이라이트
+	modulate = Color(1.15, 1.15, 1.15, 1.0) if _connection_target_highlight else Color(1.0, 1.0, 1.0, 1.0)
 	if not _shatter_played or not _shards_settled or _shard_sprites.is_empty():
 		return
 	var hp = get_tree().get_first_node_in_group("heart_pulse")
